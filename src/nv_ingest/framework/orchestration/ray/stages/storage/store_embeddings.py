@@ -3,9 +3,16 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+from typing import Any, Optional
 
+import pandas as pd
 import ray
 
+from az_nv_ingest.azure.ai_search import (
+    AzureAISearchVectorStore,
+    build_documents_from_dataframe,
+    get_azure_search_config,
+)
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
 from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
@@ -22,12 +29,13 @@ logger = logging.getLogger(__name__)
 @ray.remote
 class EmbeddingStorageStage(RayActorStage):
     """
-    A Ray actor stage that stores text embeddings in MinIO.
+    A Ray actor stage that stores text embeddings in the configured backend.
 
     It expects an IngestControlMessage containing a DataFrame with embedding data. It then:
       1. Removes the "store_embedding" task from the message.
-      2. Calls the embedding storage logic (via store_text_embeddings_internal) using a validated configuration.
-      3. Updates the message payload with the stored embeddings DataFrame.
+      2. Attempts an Azure Cognitive Search upsert when the task supplies Azure config.
+      3. Falls back to the default MinIO/Milvus upload path when Azure config is absent.
+      4. Updates the message payload with the stored embeddings DataFrame.
     """
 
     def __init__(self, config: EmbeddingStorageSchema) -> None:
@@ -66,6 +74,11 @@ class EmbeddingStorageStage(RayActorStage):
         task_config = remove_task_by_type(control_message, "store_embedding")
         logger.debug("Extracted task config: %s", task_config)
 
+        azure_upload_df = _maybe_upload_to_azure_search(df_ledger, task_config)
+        if azure_upload_df is not None:
+            control_message.payload(azure_upload_df)
+            return control_message
+
         # Perform embedding storage.
         new_df = store_text_embeddings_internal(
             df_store_ledger=df_ledger,
@@ -79,3 +92,38 @@ class EmbeddingStorageStage(RayActorStage):
         control_message.payload(new_df)
 
         return control_message
+
+
+def _maybe_upload_to_azure_search(df_store_ledger: pd.DataFrame, task_config: Any) -> Optional[pd.DataFrame]:
+    if hasattr(task_config, "model_dump"):
+        task_config = task_config.model_dump()
+
+    params = (task_config or {}).get("params")
+    azure_config = get_azure_search_config(params)
+    if not azure_config:
+        return None
+
+    logger.info("Using Azure Cognitive Search vector store: index=%s", azure_config.index_name)
+    vector_store = AzureAISearchVectorStore(azure_config)
+    documents = build_documents_from_dataframe(df_store_ledger, azure_config)
+    vector_store.upsert_documents(documents)
+    return _annotate_embedding_metadata(df_store_ledger, azure_config.index_name)
+
+
+def _annotate_embedding_metadata(df_store_ledger: pd.DataFrame, index_name: str) -> pd.DataFrame:
+    updated_df = df_store_ledger.copy()
+    for idx, row in updated_df.iterrows():
+        metadata = row.get("metadata")
+        if not isinstance(metadata, dict) or metadata.get("embedding") is None:
+            continue
+
+        updated_metadata = metadata.copy()
+        embedding_metadata = updated_metadata.get("embedding_metadata") or {}
+        if not isinstance(embedding_metadata, dict):
+            embedding_metadata = {}
+
+        embedding_metadata["uploaded_embedding_index"] = index_name
+        updated_metadata["embedding_metadata"] = embedding_metadata
+        updated_df.at[idx, "metadata"] = updated_metadata
+
+    return updated_df
