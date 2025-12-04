@@ -17,6 +17,21 @@ def test_load_azure_embedding_config_returns_none_when_flag_disabled():
     assert load_azure_embedding_config({}) is None
 
 
+def test_load_azure_embedding_config_returns_config_when_enabled():
+    env = {
+        "AZURE_OPENAI_EMBEDDINGS_ENABLED": "1",
+        "AZURE_OPENAI_ENDPOINT": "https://example.openai.azure.com",
+        "AZURE_OPENAI_EMBEDDING_DEPLOYMENT": "embed-deploy",
+        "AZURE_OPENAI_API_KEY": "secret",
+    }
+
+    config = load_azure_embedding_config(env)
+
+    assert config is not None
+    assert config.deployment == "embed-deploy"
+    assert config.api_key == "secret"
+
+
 def test_azure_make_async_request_sends_expected_payload():
     captured_requests = []
 
@@ -136,8 +151,8 @@ def test_azure_embeddings_provider_patches_and_restores():
         deployment="embed-deploy",
         api_key="stub-key",
         max_retries=0,
-        backoff_seconds=0.0,
-        max_backoff_seconds=0.0,
+        backoff_seconds=0.1,
+        max_backoff_seconds=0.1,
     )
 
     with azure_embeddings_provider(config):

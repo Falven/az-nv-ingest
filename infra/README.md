@@ -14,7 +14,7 @@ Azure Bicep templates to stand up the az-nv-ingest runtime on AKS with optional 
 - Optional ACR (system-assigned MI) and `AcrPull` role assignment to AKS kubelet identity
 - Optional Key Vault (RBAC) with `Key Vault Secrets User` for the workload identity
 - Optional Log Analytics + Application Insights
-- Optional Azure Cognitive Search (system-assigned MI)
+- Optional Azure Cognitive Search (system-assigned MI) + `Search Index Data Contributor` role for the workload identity (when enabled)
 
 ## Quickstart (subscription-scope)
 1. `az login` and `az account set -s <subscription-id>`
@@ -56,3 +56,16 @@ Name defaults use `uniqueString(subscription().id, environment)` to keep global 
 - AKS OIDC issuer and workload identity are enabled by default. Use the emitted `oidcIssuerUrl` + `workloadIdentityClientId` when creating Kubernetes service accounts with Azure Workload Identity.
 - Default GPU size `Standard_NC12ads_A10_v4` is available in many regions; adjust if unsupported in your target region.
 - Key Vault and ACR names are alphanumeric to satisfy global naming rules; override via parameters if you need deterministic names.
+
+### Managed identity for Search uploads
+- When `deployCognitiveSearch=true` and `createWorkloadIdentity=true`, the deployment grants the workload identity the **Search Index Data Contributor** role on the Search service.
+- You still need a federated credential binding your Kubernetes service account to the workload identity. Example (replace namespace/service account):
+  ```bash
+  az identity federated-credential create \
+    --name az-nv-ingest-search \
+    --identity-name $WORKLOAD_IDENTITY_NAME \
+    --resource-group $PLATFORM_RG \
+    --issuer "$(az deployment sub show --name az-nv-ingest-dev --query "properties.outputs.oidcIssuerUrl.value" -o tsv)" \
+    --subject "system:serviceaccount:<namespace>:<service-account-name>" \
+    --audiences "api://AzureADTokenExchange"
+  ```

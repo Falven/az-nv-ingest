@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import os
 from typing import Any, Optional
 
 import pandas as pd
@@ -12,6 +13,7 @@ from az_nv_ingest.azure.ai_search import (
     AzureAISearchVectorStore,
     build_documents_from_dataframe,
     get_azure_search_config,
+    get_azure_search_config_from_env,
 )
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
 from nv_ingest.framework.util.flow_control import filter_by_task
@@ -99,7 +101,7 @@ def _maybe_upload_to_azure_search(df_store_ledger: pd.DataFrame, task_config: An
         task_config = task_config.model_dump()
 
     params = (task_config or {}).get("params")
-    azure_config = get_azure_search_config(params)
+    azure_config = get_azure_search_config(params) or get_azure_search_config_from_env(os.environ)
     if not azure_config:
         return None
 

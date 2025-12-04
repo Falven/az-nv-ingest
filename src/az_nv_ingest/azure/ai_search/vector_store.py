@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, TypeVar
+import os
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, TypeVar, Literal
 
 import pandas as pd
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from az_nv_ingest.azure.key_vault import build_key_vault_credential
 from nv_ingest_api.internal.enums.common import ContentTypeEnum
 
 logger = logging.getLogger(__name__)
@@ -24,7 +26,9 @@ class AzureAISearchUpsertError(RuntimeError):
 class AzureAISearchConfig(BaseModel):
     endpoint: str
     index_name: str
-    api_key: str
+    auth_mode: Literal["apiKey", "managedIdentity"] = "apiKey"
+    api_key: Optional[str] = None
+    managed_identity_client_id: Optional[str] = None
     embedding_field: str = Field(default="vector")
     content_field: str = Field(default="content")
     id_field: str = Field(default="id")
@@ -48,6 +52,23 @@ class AzureAISearchConfig(BaseModel):
         if not value:
             raise ValueError(f"{info.field_name.replace('_', ' ')} is required")
         return value
+
+    @model_validator(mode="after")
+    def validate_auth(self) -> "AzureAISearchConfig":
+        if self.auth_mode == "apiKey" and not self.api_key:
+            raise ValueError("api_key is required when auth_mode='apiKey'")
+        return self
+
+
+def _normalize_auth_mode(value: str | None) -> str:
+    if value is None:
+        return "apiKey"
+    normalized = value.strip().lower()
+    if normalized in {"apikey", "api_key"}:
+        return "apiKey"
+    if normalized in {"managedidentity", "managed_identity"}:
+        return "managedIdentity"
+    return value
 
 
 def _chunked(items: Sequence[T], size: int) -> Iterable[List[T]]:
@@ -142,14 +163,21 @@ def get_azure_search_config(params: Optional[Dict[str, Any]]) -> Optional[AzureA
     endpoint = params.get("azure_search_endpoint") or params.get("azure_ai_search_endpoint")
     index_name = params.get("azure_search_index") or params.get("azure_ai_search_index_name")
     api_key = params.get("azure_search_api_key") or params.get("azure_ai_search_api_key")
+    auth_mode = _normalize_auth_mode(params.get("azure_search_auth_mode"))
+    managed_identity_client_id = params.get("azure_search_managed_identity_client_id")
 
-    if not (endpoint and index_name and api_key):
+    if not endpoint or not index_name:
+        return None
+
+    if (auth_mode or "").lower() == "apikey" and not api_key:
         return None
 
     return AzureAISearchConfig(
         endpoint=endpoint,
         index_name=index_name,
         api_key=api_key,
+        auth_mode=auth_mode,
+        managed_identity_client_id=managed_identity_client_id,
         embedding_field=params.get("azure_search_embedding_field", "vector"),
         content_field=params.get("azure_search_content_field", "content"),
         id_field=params.get("azure_search_id_field", "id"),
@@ -160,15 +188,61 @@ def get_azure_search_config(params: Optional[Dict[str, Any]]) -> Optional[AzureA
     )
 
 
+def get_azure_search_config_from_env(env: Mapping[str, str]) -> Optional[AzureAISearchConfig]:
+    """Create an AzureAISearchConfig from environment variables."""
+
+    endpoint = env.get("AZURE_COGNITIVE_SEARCH_ENDPOINT")
+    index_name = env.get("AZURE_COGNITIVE_SEARCH_INDEX")
+    auth_mode = _normalize_auth_mode(env.get("AZURE_COGNITIVE_SEARCH_AUTH_MODE") or "apiKey")
+    api_key = env.get("AZURE_COGNITIVE_SEARCH_API_KEY")
+    managed_identity_client_id = env.get("AZURE_CLIENT_ID")
+
+    if not endpoint or not index_name:
+        return None
+
+    if auth_mode.lower() == "apikey" and not api_key:
+        return None
+
+    return AzureAISearchConfig(
+        endpoint=endpoint,
+        index_name=index_name,
+        auth_mode=auth_mode,
+        api_key=api_key,
+        managed_identity_client_id=managed_identity_client_id,
+    )
+
+
+def build_search_credential(
+    config: AzureAISearchConfig,
+    env: Mapping[str, str] | None = None,
+):
+    if config.auth_mode == "apiKey":
+        if not config.api_key:
+            raise AzureAISearchUpsertError("api_key is required when auth_mode='apiKey'")
+        return AzureKeyCredential(config.api_key)
+
+    env_with_client = dict(env or os.environ)
+    if config.managed_identity_client_id and not env_with_client.get("AZURE_CLIENT_ID"):
+        env_with_client["AZURE_CLIENT_ID"] = config.managed_identity_client_id
+
+    return build_key_vault_credential(env_with_client)
+
+
 class AzureAISearchVectorStore:
     """Adapter for idempotent Azure Cognitive Search upserts."""
 
-    def __init__(self, config: AzureAISearchConfig, client: Optional[SearchClient] = None) -> None:
+    def __init__(
+        self,
+        config: AzureAISearchConfig,
+        client: Optional[SearchClient] = None,
+        env: Mapping[str, str] | None = None,
+    ) -> None:
         self.config = config
+        self._env = env or os.environ
         self._client = client or SearchClient(
             endpoint=config.endpoint,
             index_name=config.index_name,
-            credential=AzureKeyCredential(config.api_key),
+            credential=self._build_credential(),
         )
 
     def upsert_documents(self, documents: Sequence[Dict[str, Any]]) -> None:
@@ -204,5 +278,7 @@ class AzureAISearchVectorStore:
                 error_message = getattr(result, "error_message", "unknown error")
                 raise AzureAISearchUpsertError(
                     f"Azure Search upsert failed for id '{doc.get(self.config.id_field)}': {error_message}"
-                )
+            )
 
+    def _build_credential(self):
+        return build_search_credential(self.config, env=self._env)

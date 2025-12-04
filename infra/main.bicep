@@ -125,6 +125,7 @@ var keyVaultResourceId = resourceId(resolvedPlatformRg, 'Microsoft.KeyVault/vaul
 
 var acrPullRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
 var kvSecretsUserRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
+var searchDataContributorRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '8ebe5a00-799e-43f5-93ac-243d3dce84a7')
 
 // Resource groups
 resource aksRg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
@@ -262,6 +263,19 @@ module kvSecretsAssignment 'modules/keyVaultRoleAssignment.bicep' = if (deployKe
     keyVaultName: resolvedKeyVaultName
     principalId: workloadIdentity.outputs.principalId
     roleDefinitionId: kvSecretsUserRoleId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Grant Search data-plane rights to workload identity when both exist
+module searchDataAssignment 'modules/searchRoleAssignment.bicep' = if (deployCognitiveSearch && createWorkloadIdentity) {
+  name: 'search-data'
+  scope: platformRg
+  params: {
+    roleAssignmentName: guid(search.outputs.id, searchDataContributorRoleId, resolvedWorkloadIdentityName)
+    searchServiceName: resolvedSearchName
+    principalId: workloadIdentity.outputs.principalId
+    roleDefinitionId: searchDataContributorRoleId
     principalType: 'ServicePrincipal'
   }
 }

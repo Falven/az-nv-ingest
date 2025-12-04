@@ -6,6 +6,7 @@ import copy
 
 import pandas as pd
 
+from az_nv_ingest.azure.ai_search import AzureAISearchConfig
 from nv_ingest.framework.orchestration.ray.stages.storage import store_embeddings
 
 
@@ -58,3 +59,69 @@ def test_maybe_upload_to_azure_search_uses_vector_store(monkeypatch):
     assert result_df.at[0, "metadata"]["embedding_metadata"]["uploaded_embedding_index"] == "test-index"
     # Ensure original frame was not mutated
     assert "embedding_metadata" not in original_metadata
+
+
+def test_maybe_upload_to_azure_search_prefers_task_params(monkeypatch):
+    df = _build_df()
+    calls: dict[str, str] = {}
+
+    def _fake_env_config(_env):
+        return AzureAISearchConfig(
+            endpoint="https://env.search.windows.net",
+            index_name="env-index",
+            api_key="env-key",
+        )
+
+    def _fake_param_config(params):
+        calls["params"] = params
+        return AzureAISearchConfig(
+            endpoint="https://param.search.windows.net",
+            index_name="param-index",
+            api_key="param-key",
+        )
+
+    class _DummyStore:
+        def __init__(self, config):
+            self.config = config
+
+        def upsert_documents(self, _):
+            calls["used_index"] = self.config.index_name
+
+    monkeypatch.setattr(store_embeddings, "get_azure_search_config", _fake_param_config)
+    monkeypatch.setattr(store_embeddings, "get_azure_search_config_from_env", _fake_env_config)
+    monkeypatch.setattr(store_embeddings, "AzureAISearchVectorStore", _DummyStore)
+    monkeypatch.setattr(store_embeddings, "build_documents_from_dataframe", lambda df_store, cfg: [])
+
+    task_config = {"params": {"azure_search_endpoint": "https://param.search.windows.net"}}
+    store_embeddings._maybe_upload_to_azure_search(df, task_config)
+
+    assert calls["used_index"] == "param-index"
+
+
+def test_maybe_upload_to_azure_search_falls_back_to_env(monkeypatch):
+    df = _build_df()
+    calls: dict[str, str] = {}
+
+    def _fake_env_config(_env):
+        return AzureAISearchConfig(
+            endpoint="https://env.search.windows.net",
+            index_name="env-index",
+            api_key="env-key",
+        )
+
+    class _DummyStore:
+        def __init__(self, config):
+            self.config = config
+
+        def upsert_documents(self, _):
+            calls["used_index"] = self.config.index_name
+
+    monkeypatch.setattr(store_embeddings, "get_azure_search_config", lambda params: None)
+    monkeypatch.setattr(store_embeddings, "get_azure_search_config_from_env", _fake_env_config)
+    monkeypatch.setattr(store_embeddings, "AzureAISearchVectorStore", _DummyStore)
+    monkeypatch.setattr(store_embeddings, "build_documents_from_dataframe", lambda df_store, cfg: [])
+
+    result = store_embeddings._maybe_upload_to_azure_search(df, task_config={})
+
+    assert calls["used_index"] == "env-index"
+    assert result is not None

@@ -135,6 +135,8 @@ spec:
 
             # Azure OpenAI Embeddings
             {{- if .Values.azureOpenAI.enabled }}
+            - name: AZURE_OPENAI_EMBEDDINGS_ENABLED
+              value: "1"
             - name: AZURE_OPENAI_ENDPOINT
               value: "{{ .Values.azureOpenAI.endpoint }}"
             {{- if .Values.azureOpenAI.embeddingDeployment }}
@@ -158,6 +160,16 @@ spec:
             {{- if and .Values.azureOpenAI.useAsDefaultEmbeddingEndpoint .Values.azureOpenAI.embeddingDeployment }}
             - name: EMBEDDING_NIM_MODEL_NAME
               value: "{{ .Values.azureOpenAI.embeddingDeployment }}"
+            {{- end }}
+            {{- end }}
+
+            # Azure Key Vault runtime hydration
+            {{- if and .Values.azureKeyVault.runtime.enabled .Values.azureKeyVault.runtime.vaultUri }}
+            - name: AZURE_KEY_VAULT_URI
+              value: "{{ .Values.azureKeyVault.runtime.vaultUri }}"
+            {{- if .Values.azureKeyVault.runtime.secretMappings }}
+            - name: AZURE_KEY_VAULT_SECRET_MAPPINGS
+              value: "{{ .Values.azureKeyVault.runtime.secretMappings }}"
             {{- end }}
             {{- end }}
 

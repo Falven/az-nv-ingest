@@ -11,6 +11,7 @@ from az_nv_ingest.azure.ai_search import (
     AzureAISearchVectorStore,
     build_documents_from_dataframe,
     get_azure_search_config,
+    get_azure_search_config_from_env,
 )
 
 
@@ -45,6 +46,56 @@ def _build_sample_df(content: str = "hello world", document_type: str = "text") 
 
 def test_get_azure_search_config_returns_none_when_incomplete():
     assert get_azure_search_config({"azure_search_endpoint": "https://example"}) is None
+
+
+def test_get_azure_search_config_from_env_prefers_api_key():
+    env = {
+        "AZURE_COGNITIVE_SEARCH_ENDPOINT": "https://example.search.windows.net",
+        "AZURE_COGNITIVE_SEARCH_INDEX": "idx",
+        "AZURE_COGNITIVE_SEARCH_API_KEY": "api-key",
+    }
+
+    config = get_azure_search_config_from_env(env)
+
+    assert config is not None
+    assert config.auth_mode == "apiKey"
+    assert config.api_key == "api-key"
+
+
+def test_azure_search_vector_store_uses_managed_identity(monkeypatch):
+    env = {
+        "AZURE_TENANT_ID": "tenant-id",
+        "AZURE_FEDERATED_TOKEN_FILE": "/tmp/token",
+    }
+    credential_env = {}
+
+    def fake_build_credential(passed_env):
+        credential_env.update(passed_env)
+        return "token-cred"
+
+    class _FakeSearchClient:
+        def __init__(self, endpoint, index_name, credential):
+            self.endpoint = endpoint
+            self.index_name = index_name
+            self.credential = credential
+
+        def merge_or_upload_documents(self, documents):  # pragma: no cover - not used
+            return []
+
+    monkeypatch.setattr("az_nv_ingest.azure.ai_search.vector_store.build_key_vault_credential", fake_build_credential)
+    monkeypatch.setattr("az_nv_ingest.azure.ai_search.vector_store.SearchClient", _FakeSearchClient)
+
+    config = AzureAISearchConfig(
+        endpoint="https://example.search.windows.net",
+        index_name="idx",
+        auth_mode="managedIdentity",
+        managed_identity_client_id="client-id",
+    )
+
+    store = AzureAISearchVectorStore(config=config, env=env)
+
+    assert credential_env["AZURE_CLIENT_ID"] == "client-id"
+    assert store._client.credential == "token-cred"
 
 
 def test_build_documents_from_dataframe_maps_fields():
@@ -115,4 +166,3 @@ def test_upsert_documents_raises_on_failure():
 
     with pytest.raises(AzureAISearchUpsertError):
         store.upsert_documents([{config.id_field: "a", config.embedding_field: [0.1], config.content_field: "one"}])
-

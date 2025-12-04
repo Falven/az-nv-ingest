@@ -1159,6 +1159,9 @@ azureOpenAI:
 ## @param azureKeyVault.secretProviderClass.objects [array] List of objects to mount from Key Vault (objectName/objectType/objectVersion/objectAlias).
 ## @param azureKeyVault.secretProviderClass.secretObjects [array] secretObjects mapping for syncing to Kubernetes secrets.
 ## @param azureKeyVault.secretProviderClass.parameters [object] Extra provider parameters to include verbatim.
+## @param azureKeyVault.runtime.enabled [default: false] Enable runtime secret hydration via Key Vault API.
+## @param azureKeyVault.runtime.vaultUri [string] Key Vault URI used by the runtime loader.
+## @param azureKeyVault.runtime.secretMappings [string] Comma-separated mapping ENV=secret-name for runtime hydration.
 azureKeyVault:
   enabled: false
   mountPath: /mnt/azure-keyvault
@@ -1176,6 +1179,10 @@ azureKeyVault:
     objects: []
     secretObjects: []
     parameters: {}
+  runtime:
+    enabled: false
+    vaultUri: ""
+    secretMappings: ""
 
 ## @section Application Insights
 ## @descriptionStart
@@ -1403,6 +1410,16 @@ serviceAccount:
   automount: true
   create: true
   name: ""
+
+## @section Workload Identity
+## @descriptionStart
+## Optional Azure Workload Identity wiring for the service account used by nv-ingest.
+## @descriptionEnd
+## @param workloadIdentity.enabled [default: false] Add azure.workload.identity labels/annotations to the service account.
+## @param workloadIdentity.clientId [string] Client ID of the user-assigned managed identity to bind.
+workloadIdentity:
+  enabled: false
+  clientId: ""
 
 ## @section Secret Creation
 ## @descriptionStart

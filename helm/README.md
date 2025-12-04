@@ -397,6 +397,9 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | azureKeyVault.secretProviderClass.usePodIdentity | bool | `true` |  |
 | azureKeyVault.secretProviderClass.useVMManagedIdentity | bool | `false` |  |
 | azureKeyVault.secretProviderClass.userAssignedIdentityID | string | `""` |  |
+| azureKeyVault.runtime.enabled | bool | `false` |  |
+| azureKeyVault.runtime.secretMappings | string | `""` |  |
+| azureKeyVault.runtime.vaultUri | string | `""` |  |
 | azureOpenAI.apiKey.createSecret | bool | `false` |  |
 | azureOpenAI.apiKey.existingSecret | string | `""` |  |
 | azureOpenAI.apiKey.secretKey | string | `"azure-openai-api-key"` |  |
@@ -878,6 +881,8 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | serviceAccount.automount | bool | `true` |  |
 | serviceAccount.create | bool | `true` |  |
 | serviceAccount.name | string | `""` |  |
+| workloadIdentity.clientId | string | `""` |  |
+| workloadIdentity.enabled | bool | `false` |  |
 | text-embedding-nim.autoscaling.enabled | bool | `false` |  |
 | text-embedding-nim.autoscaling.maxReplicas | int | `10` |  |
 | text-embedding-nim.autoscaling.metrics | list | `[]` |  |
