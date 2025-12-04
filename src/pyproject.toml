@@ -67,6 +67,9 @@ dependencies = [
     "nvidia-riva-client==2.20.0",
     "unstructured-client",
     "markitdown",
+    "azure-identity>=1.25.1",
+    "azure-keyvault-secrets>=4.10.0",
+    "azure-monitor-opentelemetry-exporter>=1.0.0b45",
 ]
 
 [project.urls]
@@ -76,3 +79,6 @@ documentation = "https://docs.nvidia.com/nv-ingest"
 
 [tool.setuptools.dynamic]
 version = {attr = "nv_ingest.version.get_version"}
+
+[tool.setuptools.packages.find]
+include = ["nv_ingest*", "az_nv_ingest*"]

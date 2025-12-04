@@ -2,21 +2,25 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import os
 from datetime import datetime
 from typing import Any, Optional
 
 import ray
 from opentelemetry import trace
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.sdk.trace.id_generator import RandomIdGenerator
 from opentelemetry.trace import NonRecordingSpan
 from opentelemetry.trace import SpanContext
 from opentelemetry.trace import Status
 from opentelemetry.trace import StatusCode
 from opentelemetry.trace import TraceFlags
+
+from az_nv_ingest.azure.key_vault import load_key_vault_secrets
+from az_nv_ingest.azure.observability import (
+    configure_tracer,
+    parse_otlp_headers,
+    resolve_app_insights_connection_string,
+)
 
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
 from nv_ingest.framework.schemas.framework_otel_tracer_schema import OpenTelemetryTracerSchema
@@ -41,12 +45,24 @@ class OpenTelemetryTracerStage(RayActorStage):
         # self._logger.info(f"[Telemetry] Initializing OpenTelemetry tracer stage with config: {config}")
 
         self.validated_config: OpenTelemetryTracerSchema = config
-        self.resource = Resource(attributes={"service.name": "nv-ingest"})
-        self.otlp_exporter = OTLPSpanExporter(endpoint=self.validated_config.otel_endpoint, insecure=True)
-        self.span_processor = BatchSpanProcessor(self.otlp_exporter)
+        load_key_vault_secrets()
 
-        trace.set_tracer_provider(TracerProvider(resource=self.resource))
-        trace.get_tracer_provider().add_span_processor(self.span_processor)
+        service_name = os.getenv("OTEL_SERVICE_NAME", "nv-ingest")
+        otlp_headers = self.validated_config.otel_headers or parse_otlp_headers(
+            os.getenv("OTEL_EXPORTER_OTLP_HEADERS", ""),
+        )
+        connection_string = (
+            self.validated_config.resolved_connection_string
+            or resolve_app_insights_connection_string(os.environ)
+        )
+
+        configure_tracer(
+            service_name=service_name,
+            env=os.environ,
+            connection_string=connection_string,
+            otlp_endpoint=self.validated_config.otel_endpoint,
+            otlp_headers=otlp_headers,
+        )
 
         self.tracer = trace.get_tracer(__name__)
 

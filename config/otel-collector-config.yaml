@@ -3,6 +3,10 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+# Note: when APPLICATIONINSIGHTS_CONNECTION_STRING (or the corresponding
+# Key Vault-backed mapping) is set, services can export traces directly to
+# Azure Application Insights without flowing through this collector.
+
 receivers:
   otlp:
     protocols:

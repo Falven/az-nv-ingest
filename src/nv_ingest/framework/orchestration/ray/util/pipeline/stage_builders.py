@@ -2,10 +2,13 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import os
-import click
 import logging
+import os
+
+import click
 import psutil
+
+from az_nv_ingest.azure.observability import parse_otlp_headers, resolve_app_insights_connection_string
 
 from nv_ingest.framework.orchestration.ray.stages.sinks.default_drain import DefaultDrainSink
 from nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer import OpenTelemetryTracerStage
@@ -406,10 +409,14 @@ def add_html_extractor_stage(pipeline, default_cpu_count, stage_name="html_extra
 def add_otel_tracer_stage(pipeline, default_cpu_count, stage_name="otel_tracer"):
     _ = default_cpu_count  # Placeholder for future use
     otel_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+    otel_headers = parse_otlp_headers(os.getenv("OTEL_EXPORTER_OTLP_HEADERS", ""))
+    app_insights_connection = resolve_app_insights_connection_string(os.environ)
 
     otel_tracer_config = OpenTelemetryTracerSchema(
         **{
             "otel_endpoint": otel_endpoint,
+            "otel_headers": otel_headers,
+            "app_insights_connection_string": app_insights_connection,
         }
     )
 

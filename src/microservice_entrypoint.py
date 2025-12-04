@@ -9,6 +9,8 @@ import os
 import click
 from pydantic import ValidationError
 
+from az_nv_ingest.azure.key_vault import load_key_vault_secrets
+
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline, PipelineCreationSchema
 from nv_ingest_api.util.converters.containers import merge_dict
 from nv_ingest_api.util.logging.configuration import LogLevel
@@ -56,6 +58,9 @@ def cli(
         logger.info(f"Log level overridden by CLI to {log_level}")
 
     cli_ingest_config = {}  # Placeholder for future CLI overrides
+
+    # Hydrate secrets from Azure Key Vault (opt-in) before reading config/env
+    load_key_vault_secrets()
 
     try:
         if ingest_config_path:

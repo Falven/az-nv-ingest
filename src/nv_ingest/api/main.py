@@ -6,11 +6,9 @@ import logging
 import os
 
 from fastapi import FastAPI
-from opentelemetry import trace
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+from az_nv_ingest.azure.key_vault import load_key_vault_secrets
+from az_nv_ingest.azure.observability import configure_tracer
 
 from .v1.health import router as HealthApiRouter
 from .v1.ingest import router as IngestApiRouter
@@ -34,12 +32,9 @@ app.include_router(IngestApiRouter, prefix="/v1")
 app.include_router(HealthApiRouter, prefix="/v1/health")
 app.include_router(MetricsApiRouter, prefix="/v1")
 
-# Set up the tracer provider and add a processor for exporting traces
-resource = Resource(attributes={"service.name": "nv-ingest"})
-trace.set_tracer_provider(TracerProvider(resource=resource))
-tracer = trace.get_tracer(__name__)
+# Optionally hydrate secrets from Key Vault before wiring telemetry
+load_key_vault_secrets()
 
-otel_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "otel-collector:4317")
-exporter = OTLPSpanExporter(endpoint=otel_endpoint, insecure=True)
-span_processor = BatchSpanProcessor(exporter)
-trace.get_tracer_provider().add_span_processor(span_processor)
+# Configure tracing: defaults to OTLP; switches to App Insights when a
+# connection string is present (env or Key Vault)
+tracer = configure_tracer(service_name=os.getenv("OTEL_SERVICE_NAME", "nv-ingest"))
