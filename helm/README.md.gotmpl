@@ -108,6 +108,50 @@ In this case, make sure to remove the following from your helm command:
     --set ngcApiSecret.password="${NGC_API_KEY}" \
 ```
 
+## Azure feature toggles (examples)
+
+The chart now exposes opt-in knobs for Azure services. Enable only what you need and keep secrets in Key Vault or Kubernetes secrets.
+
+```yaml
+azureCognitiveSearch:
+  enabled: true
+  endpoint: https://<search-name>.search.windows.net
+  indexName: nv-ingest
+  authMode: apiKey
+  apiKey:
+    createSecret: true
+    value: "<azure-search-api-key>"
+
+azureOpenAI:
+  enabled: true
+  endpoint: https://<aoai-name>.openai.azure.com
+  embeddingDeployment: text-embedding-3-large
+  apiVersion: "2024-10-21"
+  apiKey:
+    createSecret: true
+    value: "<aoai-api-key>"
+
+applicationInsights:
+  enabled: true
+  createSecret: true
+  connectionString: "<app-insights-connection-string>"
+  otelEndpoint: "https://eastus-0.in.applicationinsights.azure.com/"
+
+azureKeyVault:
+  enabled: true
+  mountPath: /mnt/akv
+  secretProviderClass:
+    create: true
+    keyVaultName: "<kv-name>"
+    tenantId: "<tenant-id>"
+    objects:
+      - objectName: "ngc-api"
+        objectType: secret
+```
+
+> [!Note]
+> The nv-ingest pod now requests 1 GPU by default. Use `gpuScheduling.nodeSelector` / `gpuScheduling.tolerations` to steer pods to GPU pools (for AKS, `kubernetes.azure.com/accelerator: nvidia` is common).
+
 ## Usage
 
 Jobs are submitted via the `nv-ingest-cli` command.

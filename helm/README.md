@@ -106,6 +106,50 @@ In this case, make sure to remove the following from your helm command:
     --set ngcApiSecret.password="${NGC_API_KEY}" \
 ```
 
+## Azure feature toggles (examples)
+
+The chart now exposes opt-in knobs for Azure services. Enable only what you need and keep secrets in Key Vault or Kubernetes secrets.
+
+```yaml
+azureCognitiveSearch:
+  enabled: true
+  endpoint: https://<search-name>.search.windows.net
+  indexName: nv-ingest
+  authMode: apiKey
+  apiKey:
+    createSecret: true
+    value: "<azure-search-api-key>"
+
+azureOpenAI:
+  enabled: true
+  endpoint: https://<aoai-name>.openai.azure.com
+  embeddingDeployment: text-embedding-3-large
+  apiVersion: "2024-10-21"
+  apiKey:
+    createSecret: true
+    value: "<aoai-api-key>"
+
+applicationInsights:
+  enabled: true
+  createSecret: true
+  connectionString: "<app-insights-connection-string>"
+  otelEndpoint: "https://eastus-0.in.applicationinsights.azure.com/"
+
+azureKeyVault:
+  enabled: true
+  mountPath: /mnt/akv
+  secretProviderClass:
+    create: true
+    keyVaultName: "<kv-name>"
+    tenantId: "<tenant-id>"
+    objects:
+      - objectName: "ngc-api"
+        objectType: secret
+```
+
+> [!Note]
+> The nv-ingest pod now requests 1 GPU by default. Use `gpuScheduling.nodeSelector` / `gpuScheduling.tolerations` to steer pods to GPU pools (for AKS, `kubernetes.azure.com/accelerator: nvidia` is common).
+
 ## Usage
 
 Jobs are submitted via the `nv-ingest-cli` command.
@@ -316,10 +360,53 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | affinity | object | `{}` |  |
+| applicationInsights.connectionString | string | `""` |  |
+| applicationInsights.createSecret | bool | `false` |  |
+| applicationInsights.enabled | bool | `false` |  |
+| applicationInsights.existingSecret | string | `""` |  |
+| applicationInsights.otelEndpoint | string | `""` |  |
+| applicationInsights.roleName | string | `"nv-ingest"` |  |
+| applicationInsights.secretKey | string | `"application-insights-connection-string"` |  |
+| applicationInsights.secretName | string | `""` |  |
 | autoscaling.enabled | bool | `false` |  |
 | autoscaling.maxReplicas | int | `100` |  |
 | autoscaling.metrics | list | `[]` |  |
 | autoscaling.minReplicas | int | `1` |  |
+| azureCognitiveSearch.apiKey.createSecret | bool | `false` |  |
+| azureCognitiveSearch.apiKey.existingSecret | string | `""` |  |
+| azureCognitiveSearch.apiKey.secretKey | string | `"azure-cognitive-search-api-key"` |  |
+| azureCognitiveSearch.apiKey.secretName | string | `""` |  |
+| azureCognitiveSearch.apiKey.value | string | `""` |  |
+| azureCognitiveSearch.authMode | string | `"apiKey"` |  |
+| azureCognitiveSearch.enabled | bool | `false` |  |
+| azureCognitiveSearch.endpoint | string | `""` |  |
+| azureCognitiveSearch.indexName | string | `""` |  |
+| azureCognitiveSearch.managedIdentityClientId | string | `""` |  |
+| azureKeyVault.enabled | bool | `false` |  |
+| azureKeyVault.mountPath | string | `"/mnt/azure-keyvault"` |  |
+| azureKeyVault.readOnly | bool | `true` |  |
+| azureKeyVault.secretProviderClass.cloudName | string | `""` |  |
+| azureKeyVault.secretProviderClass.create | bool | `false` |  |
+| azureKeyVault.secretProviderClass.existingName | string | `""` |  |
+| azureKeyVault.secretProviderClass.keyVaultName | string | `""` |  |
+| azureKeyVault.secretProviderClass.name | string | `""` |  |
+| azureKeyVault.secretProviderClass.objects | list | `[]` |  |
+| azureKeyVault.secretProviderClass.parameters | object | `{}` |  |
+| azureKeyVault.secretProviderClass.secretObjects | list | `[]` |  |
+| azureKeyVault.secretProviderClass.tenantId | string | `""` |  |
+| azureKeyVault.secretProviderClass.usePodIdentity | bool | `true` |  |
+| azureKeyVault.secretProviderClass.useVMManagedIdentity | bool | `false` |  |
+| azureKeyVault.secretProviderClass.userAssignedIdentityID | string | `""` |  |
+| azureOpenAI.apiKey.createSecret | bool | `false` |  |
+| azureOpenAI.apiKey.existingSecret | string | `""` |  |
+| azureOpenAI.apiKey.secretKey | string | `"azure-openai-api-key"` |  |
+| azureOpenAI.apiKey.secretName | string | `""` |  |
+| azureOpenAI.apiKey.value | string | `""` |  |
+| azureOpenAI.apiVersion | string | `""` |  |
+| azureOpenAI.embeddingDeployment | string | `""` |  |
+| azureOpenAI.enabled | bool | `false` |  |
+| azureOpenAI.endpoint | string | `""` |  |
+| azureOpenAI.useAsDefaultEmbeddingEndpoint | bool | `true` |  |
 | containerArgs | list | `[]` |  |
 | containerSecurityContext | object | `{}` |  |
 | envVars.ARROW_DEFAULT_MEMORY_POOL | string | `"system"` |  |
@@ -370,6 +457,9 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | extraVolumeMounts | object | `{}` |  |
 | extraVolumes | object | `{}` |  |
 | fullnameOverride | string | `""` |  |
+| gpuScheduling.enabled | bool | `true` |  |
+| gpuScheduling.nodeSelector | object | `{}` |  |
+| gpuScheduling.tolerations | list | `[]` |  |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.repository | string | `"nvcr.io/nvidia/nemo-microservices/nv-ingest"` |  |
 | image.tag | string | `"25.9.0"` |  |
@@ -744,8 +834,10 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | redis.replica.resources.requests.memory | string | `"6Gi"` |  |
 | redisDeployed | bool | `true` |  |
 | replicaCount | int | `1` |  |
+| resources.limits."nvidia.com/gpu" | int | `1` |  |
 | resources.limits.cpu | string | `"48000m"` |  |
 | resources.limits.memory | string | `"200Gi"` |  |
+| resources.requests."nvidia.com/gpu" | int | `1` |  |
 | resources.requests.cpu | string | `"24000m"` |  |
 | resources.requests.memory | string | `"24Gi"` |  |
 | riva-nim.autoscaling.enabled | bool | `false` |  |

@@ -66,15 +66,31 @@ replicaCount: 1
 ## @section Resource Configuration
 ## @param resources.limits.memory [default: 200Gi] Specify limit for memory
 ## @param resources.limits.cpu [default: "48000m"] Specify limit for CPU
+## @param resources.limits.nvidia.com/gpu [default: 1] Specify GPU limit for the NVIngest pod
 ## @param resources.requests.memory [default: 24Gi] Specify request for memory
 ## @param resources.requests.cpu [default: "24000m"] Specify request for CPU
+## @param resources.requests.nvidia.com/gpu [default: 1] Specify GPU request for the NVIngest pod
 resources:
   limits:
     memory: 200Gi
     cpu: "48000m"
+    nvidia.com/gpu: 1
   requests:
     memory: 24Gi
     cpu: "24000m"
+    nvidia.com/gpu: 1
+
+## @section GPU scheduling
+## @descriptionStart
+## GPU-specific scheduling hints. GPU requests are enabled by default; use these to add AKS GPU selectors or tolerations.
+## @descriptionEnd
+## @param gpuScheduling.enabled [default: true] Whether to apply GPU-specific scheduling hints.
+## @param gpuScheduling.nodeSelector [object] Additional node selectors for GPU nodes (e.g., `kubernetes.azure.com/accelerator: "nvidia"`).
+## @param gpuScheduling.tolerations [array] Additional tolerations for GPU node taints.
+gpuScheduling:
+  enabled: true
+  nodeSelector: {}
+  tolerations: []
 
 ## @param tmpDirSize [default: 50Gi] Specify the amount of space to reserve for temporary storage
 tmpDirSize: 50Gi
@@ -1069,6 +1085,119 @@ envVars:
   COMPONENTS_TO_READY_CHECK: "ALL"
   MODEL_PREDOWNLOAD_PATH: "/workspace/models/"
   INSTALL_AUDIO_EXTRACTION_DEPS: "true"
+
+## @section Azure Cognitive Search
+## @descriptionStart
+## Optional Azure Cognitive Search integration for vector storage. When enabled, nv-ingest pods receive endpoint, index, and auth details.
+## @descriptionEnd
+## @param azureCognitiveSearch.enabled [default: false] Enable Azure Cognitive Search wiring.
+## @param azureCognitiveSearch.endpoint [string] Azure Cognitive Search endpoint (e.g., https://<resource>.search.windows.net).
+## @param azureCognitiveSearch.indexName [string] Target index name for embeddings.
+## @param azureCognitiveSearch.authMode [string] Authentication mode: apiKey or managedIdentity.
+## @param azureCognitiveSearch.managedIdentityClientId [string] Optional user-assigned managed identity client ID.
+## @param azureCognitiveSearch.apiKey.createSecret [default: false] Create a Kubernetes secret from azureCognitiveSearch.apiKey.value.
+## @param azureCognitiveSearch.apiKey.value [string] API key used when createSecret is true.
+## @param azureCognitiveSearch.apiKey.existingSecret [string] Existing secret name that stores the API key.
+## @param azureCognitiveSearch.apiKey.secretName [string] Override the generated secret name for the API key.
+## @param azureCognitiveSearch.apiKey.secretKey [default: "azure-cognitive-search-api-key"] Secret key holding the API key value.
+azureCognitiveSearch:
+  enabled: false
+  endpoint: ""
+  indexName: ""
+  authMode: apiKey
+  managedIdentityClientId: ""
+  apiKey:
+    createSecret: false
+    value: ""
+    existingSecret: ""
+    secretName: ""
+    secretKey: azure-cognitive-search-api-key
+
+## @section Azure OpenAI Embeddings
+## @descriptionStart
+## Configure Azure OpenAI as the embedding provider. When enabled, embedding env vars are pointed at the Azure endpoint and deployment.
+## @descriptionEnd
+## @param azureOpenAI.enabled [default: false] Enable Azure OpenAI embedding configuration.
+## @param azureOpenAI.endpoint [string] Azure OpenAI endpoint (e.g., https://<resource>.openai.azure.com).
+## @param azureOpenAI.embeddingDeployment [string] Deployment name to use for embeddings.
+## @param azureOpenAI.apiVersion [string] API version to use when calling Azure OpenAI.
+## @param azureOpenAI.useAsDefaultEmbeddingEndpoint [default: true] Override EMBEDDING_NIM_ENDPOINT and EMBEDDING_NIM_MODEL_NAME with Azure values.
+## @param azureOpenAI.apiKey.createSecret [default: false] Create a Kubernetes secret from azureOpenAI.apiKey.value.
+## @param azureOpenAI.apiKey.value [string] API key used when createSecret is true.
+## @param azureOpenAI.apiKey.existingSecret [string] Existing secret name that stores the API key.
+## @param azureOpenAI.apiKey.secretName [string] Override the generated secret name for the API key.
+## @param azureOpenAI.apiKey.secretKey [default: "azure-openai-api-key"] Secret key holding the API key value.
+azureOpenAI:
+  enabled: false
+  endpoint: ""
+  embeddingDeployment: ""
+  apiVersion: ""
+  useAsDefaultEmbeddingEndpoint: true
+  apiKey:
+    createSecret: false
+    value: ""
+    existingSecret: ""
+    secretName: ""
+    secretKey: azure-openai-api-key
+
+## @section Azure Key Vault CSI
+## @descriptionStart
+## Mount secrets from Azure Key Vault via the Secrets Store CSI driver. Supports using an existing SecretProviderClass or creating one.
+## @descriptionEnd
+## @param azureKeyVault.enabled [default: false] Enable Azure Key Vault CSI volume mount.
+## @param azureKeyVault.mountPath [default: "/mnt/azure-keyvault"] Mount path for Key Vault secrets.
+## @param azureKeyVault.readOnly [default: true] Mount the CSI volume as read-only.
+## @param azureKeyVault.secretProviderClass.create [default: false] Create a SecretProviderClass resource from the provided details.
+## @param azureKeyVault.secretProviderClass.name [string] Name to use when creating a SecretProviderClass.
+## @param azureKeyVault.secretProviderClass.existingName [string] Use an existing SecretProviderClass instead of creating one.
+## @param azureKeyVault.secretProviderClass.usePodIdentity [default: true] Enable Azure Workload Identity / pod identity.
+## @param azureKeyVault.secretProviderClass.useVMManagedIdentity [default: false] Use a VM managed identity instead of pod identity.
+## @param azureKeyVault.secretProviderClass.userAssignedIdentityID [string] Client ID of the user-assigned managed identity.
+## @param azureKeyVault.secretProviderClass.tenantId [string] Azure AD tenant ID for the Key Vault.
+## @param azureKeyVault.secretProviderClass.keyVaultName [string] Azure Key Vault name.
+## @param azureKeyVault.secretProviderClass.cloudName [string] Optional Azure cloud name (e.g., AzureUSGovernment).
+## @param azureKeyVault.secretProviderClass.objects [array] List of objects to mount from Key Vault (objectName/objectType/objectVersion/objectAlias).
+## @param azureKeyVault.secretProviderClass.secretObjects [array] secretObjects mapping for syncing to Kubernetes secrets.
+## @param azureKeyVault.secretProviderClass.parameters [object] Extra provider parameters to include verbatim.
+azureKeyVault:
+  enabled: false
+  mountPath: /mnt/azure-keyvault
+  readOnly: true
+  secretProviderClass:
+    create: false
+    name: ""
+    existingName: ""
+    usePodIdentity: true
+    useVMManagedIdentity: false
+    userAssignedIdentityID: ""
+    tenantId: ""
+    keyVaultName: ""
+    cloudName: ""
+    objects: []
+    secretObjects: []
+    parameters: {}
+
+## @section Application Insights
+## @descriptionStart
+## Wire telemetry to Azure Application Insights or Azure Monitor OTLP endpoints.
+## @descriptionEnd
+## @param applicationInsights.enabled [default: false] Enable Application Insights wiring.
+## @param applicationInsights.connectionString [string] Application Insights connection string used when creating a secret.
+## @param applicationInsights.createSecret [default: false] Create a Kubernetes secret from applicationInsights.connectionString.
+## @param applicationInsights.existingSecret [string] Existing secret containing the connection string.
+## @param applicationInsights.secretName [string] Override the generated secret name for the connection string.
+## @param applicationInsights.secretKey [default: "application-insights-connection-string"] Secret key holding the connection string value.
+## @param applicationInsights.otelEndpoint [string] Optional OTLP endpoint (grpc or http) for Azure Monitor ingestion.
+## @param applicationInsights.roleName [string] Cloud role name reported to Application Insights.
+applicationInsights:
+  enabled: false
+  connectionString: ""
+  createSecret: false
+  existingSecret: ""
+  secretName: ""
+  secretKey: application-insights-connection-string
+  otelEndpoint: ""
+  roleName: nv-ingest
 
 ## @section Open Telemetry
 ## @descriptionStart
