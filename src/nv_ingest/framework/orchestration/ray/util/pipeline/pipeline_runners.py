@@ -72,6 +72,9 @@ class PipelineCreationSchema(BaseModel):
     )
     nemoretriever_parse_infer_protocol: str = os.getenv("NEMORETRIEVER_PARSE_INFER_PROTOCOL", "http")
     nemoretriever_parse_model_name: str = os.getenv("NEMORETRIEVER_PARSE_MODEL_NAME", "nvidia/nemoretriever-parse")
+    nemoretriever_parse_shim_http_endpoint: str = os.getenv("NEMORETRIEVER_PARSE_SHIM_HTTP_ENDPOINT", "")
+    nemoretriever_parse_shim_grpc_endpoint: str = os.getenv("NEMORETRIEVER_PARSE_SHIM_GRPC_ENDPOINT", "")
+    nemoretriever_parse_shim_infer_protocol: str = os.getenv("NEMORETRIEVER_PARSE_SHIM_INFER_PROTOCOL", "")
 
     # API keys
     ngc_api_key: str = os.getenv("NGC_API_KEY", "")

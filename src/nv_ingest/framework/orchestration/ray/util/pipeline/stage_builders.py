@@ -3,9 +3,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
-import psutil
 import click
 import logging
+import psutil
 
 from nv_ingest.framework.orchestration.ray.stages.sinks.default_drain import DefaultDrainSink
 from nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer import OpenTelemetryTracerStage
@@ -58,10 +58,14 @@ from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema im
 from nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema import TextSplitterSchema
 from nv_ingest_api.util.system.hardware_info import SystemResourceProbe
 from nv_ingest.framework.orchestration.ray.util.env_config import DYNAMIC_MEMORY_THRESHOLD
+from nv_ingest.framework.util.patches import register_nemotron_parse_extractor
 
 logger = logging.getLogger(__name__)
 
 _system_resource_probe = SystemResourceProbe()
+
+# Ensure Nemotron Parse shim is registered before any extractor stages are created.
+register_nemotron_parse_extractor()
 
 
 def validate_positive(ctx, param, value):
@@ -97,27 +101,24 @@ def get_caption_classifier_service():
 
 def get_nim_service(env_var_prefix):
     prefix = env_var_prefix.upper()
-    grpc_endpoint = os.environ.get(
-        f"{prefix}_GRPC_ENDPOINT",
-        "",
-    )
-    http_endpoint = os.environ.get(
-        f"{prefix}_HTTP_ENDPOINT",
-        "",
-    )
-    auth_token = os.environ.get(
-        "NVIDIA_API_KEY",
-        "",
-    ) or os.environ.get(
-        "NGC_API_KEY",
-        "",
+    shim_grpc = os.environ.get(f"{prefix}_SHIM_GRPC_ENDPOINT", "")
+    shim_http = os.environ.get(f"{prefix}_SHIM_HTTP_ENDPOINT", "")
+    shim_protocol = os.environ.get(f"{prefix}_SHIM_INFER_PROTOCOL", "")
+
+    grpc_endpoint = shim_grpc or os.environ.get(f"{prefix}_GRPC_ENDPOINT", "")
+    http_endpoint = shim_http or os.environ.get(f"{prefix}_HTTP_ENDPOINT", "")
+
+    auth_token = (
+        os.environ.get(f"{prefix}_SHIM_API_KEY", "")
+        or os.environ.get("NVIDIA_API_KEY", "")
+        or os.environ.get("NGC_API_KEY", "")
     )
 
-    infer_protocol = os.environ.get(
-        f"{prefix}_INFER_PROTOCOL",
-        "http" if http_endpoint else "grpc" if grpc_endpoint else "",
-    )
+    infer_protocol_default = "http" if http_endpoint else "grpc" if grpc_endpoint else ""
+    infer_protocol = (shim_protocol or os.environ.get(f"{prefix}_INFER_PROTOCOL", infer_protocol_default)).lower()
 
+    if shim_http or shim_grpc:
+        logger.info(f"{prefix} shim endpoints detected; routing to shim endpoints (grpc={shim_grpc}, http={shim_http})")
     logger.info(f"{prefix}_GRPC_ENDPOINT: {grpc_endpoint}")
     logger.info(f"{prefix}_HTTP_ENDPOINT: {http_endpoint}")
     logger.info(f"{prefix}_INFER_PROTOCOL: {infer_protocol}")

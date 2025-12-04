@@ -1,0 +1,33 @@
+[
+  {
+    "layout_id": "table-1",
+    "continuity": {
+      "status": "spanning",
+      "position": "start",
+      "page_span": {
+        "start": 0,
+        "end": 1,
+        "pages": [0, 1]
+      }
+    }
+  },
+  {
+    "layout_id": "table-1",
+    "continuity": {
+      "status": "spanning",
+      "position": "end",
+      "page_span": {
+        "start": 0,
+        "end": 1,
+        "pages": [0, 1]
+      }
+    }
+  },
+  {
+    "layout_id": null,
+    "continuity": {
+      "status": "cannot_join",
+      "reason": "missing_layout_id"
+    }
+  }
+]
