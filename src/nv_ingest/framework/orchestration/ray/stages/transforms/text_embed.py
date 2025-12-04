@@ -4,7 +4,7 @@
 
 import logging
 import pprint
-from typing import Any
+from typing import Any, Dict
 import ray
 
 # Assume these imports come from your project:
@@ -16,6 +16,10 @@ from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema im
 from nv_ingest_api.internal.transform.embed_text import transform_create_text_embeddings_internal
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
+)
+from az_nv_ingest.azure.embeddings.provider import (
+    azure_embeddings_provider,
+    load_azure_embedding_config,
 )
 
 logger = logging.getLogger(__name__)
@@ -65,10 +69,25 @@ class TextEmbeddingTransformStage(RayActorStage):
         task_config = remove_task_by_type(control_message, "embed")
         logger.debug("TextEmbeddingTransformStage: Task configuration extracted: %s", pprint.pformat(task_config))
 
-        # Call the text embedding extraction function.
-        new_df, execution_trace_log = transform_create_text_embeddings_internal(
-            df_payload, task_config=task_config, transform_config=self.validated_config
-        )
+        azure_config = load_azure_embedding_config()
+        if azure_config is not None:
+            logger.info("Using Azure OpenAI embeddings provider.")
+            if task_config is None:
+                task_config = {}
+            azure_task_config: Dict[str, Any] = {
+                **task_config,
+                "api_key": azure_config.api_key,
+                "endpoint_url": str(azure_config.endpoint),
+                "model_name": azure_config.deployment,
+            }
+            with azure_embeddings_provider(azure_config):
+                new_df, execution_trace_log = transform_create_text_embeddings_internal(
+                    df_payload, task_config=azure_task_config, transform_config=self.validated_config
+                )
+        else:
+            new_df, execution_trace_log = transform_create_text_embeddings_internal(
+                df_payload, task_config=task_config, transform_config=self.validated_config
+            )
 
         # Update the control message payload.
         control_message.payload(new_df)

@@ -1,2 +1,1 @@
-"""Azure integrations for az-nv-ingest."""
-
+"""Azure-specific integrations for az-nv-ingest."""
