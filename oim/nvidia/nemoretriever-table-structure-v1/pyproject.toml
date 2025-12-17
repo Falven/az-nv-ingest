@@ -23,7 +23,7 @@ dependencies = [
   "torch==2.8.0",
   "torchvision==0.23.0",
   "tenacity==9.0.0",
-  "tritonclient[grpc]==2.63.0",
+  "tritonclient[grpc]==2.60.0",
   "uvicorn[standard]==0.38.0",
 ]
 

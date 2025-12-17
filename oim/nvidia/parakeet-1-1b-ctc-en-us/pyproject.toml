@@ -27,7 +27,7 @@ dependencies = [
   "torch==2.8.0",
   "transformers==4.57.3",
   "tenacity==9.0.0",
-  "tritonclient[grpc]==2.63.0",
+  "tritonclient[grpc]==2.60.0",
   "uvicorn[standard]==0.38.0",
   "webrtcvad==2.0.10",
 ]
