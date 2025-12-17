@@ -11,3 +11,15 @@ members = [
   "oim/nvidia/parakeet-1-1b-ctc-en-us",
   "oim/baidu/paddleocr",
 ]
+
+[tool.uv.sources]
+oim-common = { workspace = true }
+oim-llama-3-2-nv-embedqa-1b-v2 = { workspace = true }
+oim-llama-3-2-nv-rerankqa-1b-v2 = { workspace = true }
+oim-nemoretriever-page-elements-v3 = { workspace = true }
+oim-nemoretriever-graphic-elements-v1 = { workspace = true }
+oim-nemoretriever-table-structure-v1 = { workspace = true }
+oim-nemoretriever-ocr-v1 = { workspace = true }
+oim-nemotron-nano-12b-v2-vl = { workspace = true }
+oim-parakeet-1-1b-ctc-en-us = { workspace = true }
+oim-paddleocr = { workspace = true }
