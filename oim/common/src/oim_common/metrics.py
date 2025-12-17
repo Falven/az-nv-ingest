@@ -99,9 +99,7 @@ def observe_http_request(endpoint: str, status: str, duration_seconds: float) ->
     Record counters and latency when duration is precomputed.
     """
     REQUEST_COUNTER.labels(protocol="http", endpoint=endpoint, status=status).inc()
-    REQUEST_LATENCY.labels(protocol="http", endpoint=endpoint).observe(
-        duration_seconds
-    )
+    REQUEST_LATENCY.labels(protocol="http", endpoint=endpoint).observe(duration_seconds)
 
 
 def observe_ocr_request(

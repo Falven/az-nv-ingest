@@ -28,6 +28,7 @@ from .inference import (
 )
 from .models import ChatChoice, ChatMessageResponse, ChatRequest, ChatResponse
 from .settings import ServiceSettings
+
 settings = ServiceSettings()
 configure_logging(settings.logging_level)
 logger = logging.getLogger("nemotron-nano-12b-v2-vl")

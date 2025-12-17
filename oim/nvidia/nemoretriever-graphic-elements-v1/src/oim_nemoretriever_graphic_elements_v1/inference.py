@@ -24,6 +24,7 @@ async def encode_request_images(
     """
     return await encode_common_images(items, timeout_seconds)
 
+
 DEFAULT_LABELS: list[str] = [
     "chart_title",
     "x_title",

@@ -108,7 +108,7 @@ def test_configure_logging_is_idempotent_and_uppercases_levels() -> None:
         assert len(root_logger.handlers) == 1
         assert root_logger.level == logging.WARNING
 
-    module_logger = get_logger("oim_common.tests", level="error")
+        module_logger = get_logger("oim_common.tests", level="error")
         assert module_logger.level == logging.ERROR
     finally:
         for handler in list(root_logger.handlers):

@@ -36,7 +36,9 @@ class ServiceSettings(CommonSettings):
     endpoint_eou_threshold: float = Field(0.2, alias="ENDPOINT_EOU_THRESHOLD")
     vad_frame_ms: int = Field(30, alias="VAD_FRAME_MS")
     max_speaker_count: int = Field(2, alias="MAX_SPEAKER_COUNT")
-    punctuation_model_id: str = Field("kredor/punctuate-all", alias="PUNCTUATION_MODEL_ID")
+    punctuation_model_id: str = Field(
+        "kredor/punctuate-all", alias="PUNCTUATION_MODEL_ID"
+    )
 
     metrics_namespace: str = Field("parakeet", alias="METRICS_NAMESPACE")
 
