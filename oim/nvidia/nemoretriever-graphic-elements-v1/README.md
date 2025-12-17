@@ -36,7 +36,7 @@ git lfs install
 2) Install deps (uv recommended; pulls the HF model via pip):
 ```
 cd /Users/fran/Source/open-nv-ingest
-uv sync --no-dev --directory nim/nvidia/nemoretriever-graphic-elements-v1
+uv sync --no-dev --directory oim/nvidia/nemoretriever-graphic-elements-v1
 ```
 
 3) Run the service (starts Triton + HTTP shim; set `DEVICE` for GPU selection):
@@ -47,8 +47,8 @@ NIM_TRITON_HTTP_PORT=8100 \
 NIM_TRITON_METRICS_PORT=8003 \
 NIM_TRITON_MAX_BATCH_SIZE=8 \
 NGC_API_KEY=your_token_here \
-uv run --directory nim/nvidia/nemoretriever-graphic-elements-v1 \
-  uvicorn nemoretriever_graphic_elements_v1.server:app --host 0.0.0.0 --port ${NIM_HTTP_API_PORT:-8000}
+uv run --directory oim/nvidia/nemoretriever-graphic-elements-v1 \
+  uvicorn oim_nemoretriever_graphic_elements_v1.server:app --host 0.0.0.0 --port ${NIM_HTTP_API_PORT:-8000}
 ```
 - For API-only smoke testing without weights, set `ENABLE_MOCK_INFERENCE=1`; Triton still starts but serves mock predictions.
 
@@ -60,7 +60,7 @@ Container build (optional)
 --------------------------
 `docker-compose.yaml` now builds `nemoretriever-graphic-elements-v1-open` from this directory by default. To build/push manually:
 ```
-docker build -t nemoretriever-graphic-elements-v1-open:latest nim/nvidia/nemoretriever-graphic-elements-v1
+docker build -t nemoretriever-graphic-elements-v1-open:latest oim/nvidia/nemoretriever-graphic-elements-v1
 # optional: docker tag nemoretriever-graphic-elements-v1-open:latest <your-registry>/nemoretriever-graphic-elements-v1-open:latest
 # optional: docker push <your-registry>/nemoretriever-graphic-elements-v1-open:latest
 ```

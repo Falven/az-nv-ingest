@@ -29,7 +29,7 @@ trap cleanup TERM INT
 export TRITON_GRPC_URL=${TRITON_GRPC_URL:-"localhost:${TRITON_GRPC_PORT}"}
 export TRITON_HTTP_URL=${TRITON_HTTP_URL:-"http://127.0.0.1:${TRITON_HTTP_PORT}"}
 
-uvicorn nemoretriever_ocr_v1.server:app --host 0.0.0.0 --port "${NIM_HTTP_API_PORT:-8000}" &
+uvicorn oim_nemoretriever_ocr_v1.server:app --host 0.0.0.0 --port "${NIM_HTTP_API_PORT:-8000}" &
 UVICORN_PID=$!
 
 set +e

@@ -36,10 +36,10 @@ dependencies = [
 dev = ["pytest>=8.3.0", "ruff>=0.7.0", "mypy>=1.13.0"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/parakeet_1_1b_ctc_en_us"]
+packages = ["src/oim_parakeet_1_1b_ctc_en_us"]
 
 [tool.uv]
 managed = true
 
 [tool.uv.sources]
-common = { workspace = true }
+oim-common = { workspace = true }

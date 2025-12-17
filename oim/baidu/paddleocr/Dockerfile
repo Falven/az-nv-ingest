@@ -16,10 +16,10 @@ RUN apt-get update \
     && curl -LsSf https://astral.sh/uv/install.sh | sh
 
 COPY pyproject.toml ./pyproject.toml
-COPY nim/common ./nim/common
-COPY nim/baidu/paddleocr ./nim/baidu/paddleocr
+COPY oim/common ./oim/common
+COPY oim/baidu/paddleocr ./oim/baidu/paddleocr
 
-RUN --mount=type=cache,target=/root/.cache/uv uv sync --package paddleocr --no-dev \
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --package oim-paddleocr --no-dev \
     && mv /workspace/.venv /opt/venv
 
 FROM nvcr.io/nvidia/tritonserver:24.12-py3 AS runtime
@@ -40,10 +40,10 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/venv /opt/venv
-COPY --from=builder /workspace/nim/baidu/paddleocr/src /app/src
-COPY --from=builder /workspace/nim/baidu/paddleocr/README.md README.md
-COPY --from=builder /workspace/nim/baidu/paddleocr/triton/model_repository /models
-COPY --from=builder /workspace/nim/baidu/paddleocr/entrypoint.sh /app/entrypoint.sh
+COPY --from=builder /workspace/oim/baidu/paddleocr/src /app/src
+COPY --from=builder /workspace/oim/baidu/paddleocr/README.md README.md
+COPY --from=builder /workspace/oim/baidu/paddleocr/triton/model_repository /models
+COPY --from=builder /workspace/oim/baidu/paddleocr/entrypoint.sh /app/entrypoint.sh
 
 RUN chmod +x /app/entrypoint.sh
 

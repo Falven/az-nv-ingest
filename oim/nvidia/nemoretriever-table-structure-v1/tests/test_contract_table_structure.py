@@ -106,7 +106,7 @@ def service(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Dict[str, Any]
         sys.executable,
         "-m",
         "uvicorn",
-        "nemoretriever_table_structure_v1.server:app",
+        "oim_nemoretriever_table_structure_v1.server:app",
         "--host",
         "127.0.0.1",
         "--port",

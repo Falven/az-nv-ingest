@@ -31,10 +31,10 @@ dependencies = [
 dev = ["pytest>=8.3.0", "ruff>=0.7.0", "mypy>=1.13.0"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/llama_3_2_nv_embedqa_1b_v2"]
+packages = ["src/oim_llama_3_2_nv_embedqa_1b_v2"]
 
 [tool.uv]
 managed = true
 
 [tool.uv.sources]
-common = { workspace = true }
+oim-common = { workspace = true }

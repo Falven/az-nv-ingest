@@ -17,10 +17,10 @@ RUN apt-get update \
 
 COPY pyproject.toml ./pyproject.toml
 COPY uv.lock ./uv.lock
-COPY nim/common ./nim/common
-COPY nim/nvidia/nemoretriever-ocr-v1 ./nim/nvidia/nemoretriever-ocr-v1
+COPY oim/common ./oim/common
+COPY oim/nvidia/nemoretriever-ocr-v1 ./oim/nvidia/nemoretriever-ocr-v1
 
-WORKDIR /workspace/nim/nvidia/nemoretriever-ocr-v1
+WORKDIR /workspace/oim/nvidia/nemoretriever-ocr-v1
 
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --no-dev --frozen \
     && mv /workspace/.venv /opt/venv
@@ -42,10 +42,10 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/venv /opt/venv
-COPY --from=builder /workspace/nim/nvidia/nemoretriever-ocr-v1/src /app/src
-COPY --from=builder /workspace/nim/nvidia/nemoretriever-ocr-v1/README.md README.md
-COPY --from=builder /workspace/nim/nvidia/nemoretriever-ocr-v1/triton/model_repository /models
-COPY --from=builder /workspace/nim/nvidia/nemoretriever-ocr-v1/entrypoint.sh /app/entrypoint.sh
+COPY --from=builder /workspace/oim/nvidia/nemoretriever-ocr-v1/src /app/src
+COPY --from=builder /workspace/oim/nvidia/nemoretriever-ocr-v1/README.md README.md
+COPY --from=builder /workspace/oim/nvidia/nemoretriever-ocr-v1/triton/model_repository /models
+COPY --from=builder /workspace/oim/nvidia/nemoretriever-ocr-v1/entrypoint.sh /app/entrypoint.sh
 
 RUN chmod +x /app/entrypoint.sh
 

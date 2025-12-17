@@ -122,7 +122,7 @@ def service() -> Iterator[Dict[str, str]]:
         sys.executable,
         "-m",
         "uvicorn",
-        "nemotron_nano_12b_v2_vl.server:app",
+        "oim_nemotron_nano_12b_v2_vl.server:app",
         "--host",
         "127.0.0.1",
         "--port",

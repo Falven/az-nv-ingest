@@ -17,10 +17,10 @@ RUN apt-get update \
     && curl -LsSf https://astral.sh/uv/install.sh | sh
 
 COPY pyproject.toml ./pyproject.toml
-COPY nim/common ./nim/common
-COPY nim/nvidia/parakeet-1-1b-ctc-en-us ./nim/nvidia/parakeet-1-1b-ctc-en-us
+COPY oim/common ./oim/common
+COPY oim/nvidia/parakeet-1-1b-ctc-en-us ./oim/nvidia/parakeet-1-1b-ctc-en-us
 
-WORKDIR /workspace/nim/nvidia/parakeet-1-1b-ctc-en-us
+WORKDIR /workspace/oim/nvidia/parakeet-1-1b-ctc-en-us
 
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --no-dev \
     && mv /workspace/.venv /opt/venv
@@ -39,10 +39,10 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY --from=builder /opt/venv /opt/venv
-COPY --from=builder /workspace/nim/nvidia/parakeet-1-1b-ctc-en-us/src /app/src
-COPY --from=builder /workspace/nim/nvidia/parakeet-1-1b-ctc-en-us/triton /app/triton
-COPY --from=builder /workspace/nim/nvidia/parakeet-1-1b-ctc-en-us/README.md README.md
-COPY --from=builder /workspace/nim/nvidia/parakeet-1-1b-ctc-en-us/entrypoint.sh /app/entrypoint.sh
+COPY --from=builder /workspace/oim/nvidia/parakeet-1-1b-ctc-en-us/src /app/src
+COPY --from=builder /workspace/oim/nvidia/parakeet-1-1b-ctc-en-us/triton /app/triton
+COPY --from=builder /workspace/oim/nvidia/parakeet-1-1b-ctc-en-us/README.md README.md
+COPY --from=builder /workspace/oim/nvidia/parakeet-1-1b-ctc-en-us/entrypoint.sh /app/entrypoint.sh
 
 RUN chmod +x /app/entrypoint.sh \
     && groupadd -g 65532 appuser \

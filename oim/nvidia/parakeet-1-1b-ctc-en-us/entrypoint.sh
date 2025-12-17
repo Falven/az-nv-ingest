@@ -36,4 +36,4 @@ if [ "${ready}" -ne 1 ]; then
 	exit 1
 fi
 
-exec uvicorn parakeet_1_1b_ctc_en_us.server:app --host 0.0.0.0 --port "${NIM_HTTP_PORT}"
+exec uvicorn oim_parakeet_1_1b_ctc_en_us.server:app --host 0.0.0.0 --port "${NIM_HTTP_PORT}"

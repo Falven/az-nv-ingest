@@ -52,4 +52,4 @@ if [ "${ready}" -ne 1 ]; then
 	exit 1
 fi
 
-exec uvicorn nemotron_nano_12b_v2_vl.server:app --host 0.0.0.0 --port "${HTTP_PORT}"
+exec uvicorn oim_nemotron_nano_12b_v2_vl.server:app --host 0.0.0.0 --port "${HTTP_PORT}"

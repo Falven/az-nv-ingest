@@ -5,8 +5,8 @@ from typing import List
 
 import numpy as np
 import triton_python_backend_utils as pb_utils  # type: ignore[reportMissingImports]
-from paddleocr.inference import format_result, load_image
-from paddleocr.settings import ServiceSettings
+from oim_paddleocr.inference import format_result, load_image
+from oim_paddleocr.settings import ServiceSettings
 
 try:
     from paddleocr import PaddleOCRVL

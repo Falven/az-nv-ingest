@@ -32,10 +32,10 @@ dependencies = [
 dev = ["pytest>=8.3.0", "ruff>=0.7.0", "mypy>=1.13.0"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/nemotron_nano_12b_v2_vl"]
+packages = ["src/oim_nemotron_nano_12b_v2_vl"]
 
 [tool.uv]
 managed = true
 
 [tool.uv.sources]
-common = { workspace = true }
+oim-common = { workspace = true }

@@ -36,7 +36,7 @@ pip install -v .
 2. Install the server deps (uv or pip):
 
 ```
-cd /Users/fran/Source/open-nv-ingest/nim/nvidia/nemoretriever-ocr-v1
+cd /Users/fran/Source/open-nv-ingest/oim/nvidia/nemoretriever-ocr-v1
 uv sync
 ```
 
@@ -46,7 +46,7 @@ uv sync
 NIM_HTTP_API_PORT=8000 \
 NIM_TRITON_GRPC_PORT=8001 \
 TRITON_HTTP_PORT=8003 \
-TRITON_MODEL_REPOSITORY=/Users/fran/Source/open-nv-ingest/nim/nvidia/nemoretriever-ocr-v1/triton/model_repository \
+TRITON_MODEL_REPOSITORY=/Users/fran/Source/open-nv-ingest/oim/nvidia/nemoretriever-ocr-v1/triton/model_repository \
 MODEL_DIR=/opt/models \
 ENABLE_MOCK_INFERENCE=false \
 uv run ./entrypoint.sh

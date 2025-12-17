@@ -23,7 +23,7 @@ python3 -m pip install -U "paddleocr[doc-parser]==3.3.2" paddlex==3.3.11 opencv-
 
 2) Install the server deps:
 ```bash
-cd nim/baidu/paddleocr
+cd oim/baidu/paddleocr
 python3 -m pip install -r requirements.txt
 ```
 

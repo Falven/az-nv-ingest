@@ -16,10 +16,10 @@ RUN apt-get update \
     && curl -LsSf https://astral.sh/uv/install.sh | sh
 
 COPY pyproject.toml ./pyproject.toml
-COPY nim/common ./nim/common
-COPY nim/nvidia/nemoretriever-page-elements-v3 ./nim/nvidia/nemoretriever-page-elements-v3
+COPY oim/common ./oim/common
+COPY oim/nvidia/nemoretriever-page-elements-v3 ./oim/nvidia/nemoretriever-page-elements-v3
 
-WORKDIR /workspace/nim/nvidia/nemoretriever-page-elements-v3
+WORKDIR /workspace/oim/nvidia/nemoretriever-page-elements-v3
 
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --no-dev \
     && mv /workspace/.venv /opt/venv
@@ -38,12 +38,12 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/venv /opt/venv
-COPY --from=builder /workspace/nim/nvidia/nemoretriever-page-elements-v3/src /app/src
-COPY --from=builder /workspace/nim/nvidia/nemoretriever-page-elements-v3/triton /app/triton
-COPY --from=builder /workspace/nim/nvidia/nemoretriever-page-elements-v3/README.md README.md
+COPY --from=builder /workspace/oim/nvidia/nemoretriever-page-elements-v3/src /app/src
+COPY --from=builder /workspace/oim/nvidia/nemoretriever-page-elements-v3/triton /app/triton
+COPY --from=builder /workspace/oim/nvidia/nemoretriever-page-elements-v3/README.md README.md
 
 EXPOSE 8000 8001 8002 8003 8100
 
 USER 65532:65532
 
-CMD ["uvicorn", "nemoretriever_page_elements_v3.server:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "oim_nemoretriever_page_elements_v3.server:app", "--host", "0.0.0.0", "--port", "8000"]

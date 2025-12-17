@@ -19,10 +19,10 @@ Reverse-engineered drop-in for the private `nvcr.io/nim/nvidia/nemoretriever-tab
 Prereqs: Python 3.10+, `git-lfs`, a Triton Inference Server install (set `TRITON_SERVER_BIN`), and a PyTorch build that matches your GPU/CPU.
 
 ```bash
-cd nim/nvidia/nemoretriever-table-structure-v1
+cd oim/nvidia/nemoretriever-table-structure-v1
 uv sync
 TRITON_SERVER_BIN=/opt/tritonserver/bin/tritonserver \
-uvicorn nemoretriever_table_structure_v1.server:app --host 0.0.0.0 --port ${NIM_HTTP_API_PORT:-8000}
+uvicorn oim_nemoretriever_table_structure_v1.server:app --host 0.0.0.0 --port ${NIM_HTTP_API_PORT:-8000}
 ```
 
 Quick smoke test:

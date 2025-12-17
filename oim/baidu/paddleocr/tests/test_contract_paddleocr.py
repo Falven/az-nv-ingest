@@ -102,7 +102,7 @@ def service() -> Iterator[Dict[str, Any]]:
         sys.executable,
         "-m",
         "uvicorn",
-        "paddleocr.server:app",
+        "oim_paddleocr.server:app",
         "--host",
         "127.0.0.1",
         "--port",

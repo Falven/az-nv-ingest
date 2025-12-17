@@ -88,7 +88,7 @@ def service() -> Iterator[Dict[str, Any]]:
         sys.executable,
         "-m",
         "uvicorn",
-        "llama_3_2_nv_embedqa_1b_v2.server:app",
+        "oim_llama_3_2_nv_embedqa_1b_v2.server:app",
         "--host",
         "127.0.0.1",
         "--port",

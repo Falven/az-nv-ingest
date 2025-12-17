@@ -4,13 +4,13 @@ import logging
 from typing import Mapping
 
 import pytest
-from common.auth import (
+from oim_common.auth import (
     ensure_authorized,
     extract_bearer_token,
     extract_token_with_fallback,
 )
-from common.logging import configure_logging, get_logger
-from common.settings import CommonSettings
+from oim_common.logging import configure_logging, get_logger
+from oim_common.settings import CommonSettings
 from fastapi import HTTPException, Request
 
 
@@ -108,7 +108,7 @@ def test_configure_logging_is_idempotent_and_uppercases_levels() -> None:
         assert len(root_logger.handlers) == 1
         assert root_logger.level == logging.WARNING
 
-        module_logger = get_logger("common.tests", level="error")
+    module_logger = get_logger("oim_common.tests", level="error")
         assert module_logger.level == logging.ERROR
     finally:
         for handler in list(root_logger.handlers):

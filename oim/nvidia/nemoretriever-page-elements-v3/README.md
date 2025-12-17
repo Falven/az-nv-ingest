@@ -1,6 +1,6 @@
 # nemoretriever-page-elements-v3 (open replacement)
 
-Reverse‑engineered drop-in for the private `nim/nvidia/nemoretriever-page-elements-v3` NIM (formerly hosted at `nvcr.io/nim/nvidia/nemoretriever-page-elements-v3`). The goal is upstream alignment without touching core source: everything lives in this directory (`nims/nvidia/nemoretriever-page-elements-v3`).
+Reverse‑engineered drop-in for the private `nim/nvidia/nemoretriever-page-elements-v3` NIM (formerly hosted at `nvcr.io/nim/nvidia/nemoretriever-page-elements-v3`). The goal is upstream alignment without touching core source: everything lives in this directory (`oim/nvidia/nemoretriever-page-elements-v3`).
 
 ## What nv-ingest expects
 - HTTP: `http://nemoretriever-page-elements-v3:8000/v1/infer` returning bounding boxes in the same shape as the closed NIM. Batch size is discovered via `NIM_TRITON_MAX_BATCH_SIZE`.

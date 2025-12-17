@@ -87,7 +87,7 @@ def service() -> Iterator[Dict[str, Any]]:
         sys.executable,
         "-m",
         "uvicorn",
-        "parakeet_1_1b_ctc_en_us.server:app",
+        "oim_parakeet_1_1b_ctc_en_us.server:app",
         "--host",
         "127.0.0.1",
         "--port",

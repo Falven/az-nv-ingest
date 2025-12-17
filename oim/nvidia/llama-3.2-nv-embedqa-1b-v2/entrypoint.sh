@@ -35,4 +35,4 @@ if [ "${ready}" -ne 1 ]; then
 	exit 1
 fi
 
-exec uvicorn llama_3_2_nv_embedqa_1b_v2.server:app --host 0.0.0.0 --port "${NIM_HTTP_API_PORT:-8000}"
+exec uvicorn oim_llama_3_2_nv_embedqa_1b_v2.server:app --host 0.0.0.0 --port "${NIM_HTTP_API_PORT:-8000}"

@@ -17,10 +17,10 @@ RUN apt-get update \
     && curl -LsSf https://astral.sh/uv/install.sh | sh
 
 COPY pyproject.toml ./pyproject.toml
-COPY nim/common ./nim/common
-COPY nim/nvidia/llama-3.2-nv-embedqa-1b-v2 ./nim/nvidia/llama-3.2-nv-embedqa-1b-v2
+COPY oim/common ./oim/common
+COPY oim/nvidia/llama-3.2-nv-embedqa-1b-v2 ./oim/nvidia/llama-3.2-nv-embedqa-1b-v2
 
-WORKDIR /workspace/nim/nvidia/llama-3.2-nv-embedqa-1b-v2
+WORKDIR /workspace/oim/nvidia/llama-3.2-nv-embedqa-1b-v2
 
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --no-dev \
     && mv /workspace/.venv /opt/venv
@@ -39,10 +39,10 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY --from=builder /opt/venv /opt/venv
-COPY --from=builder /workspace/nim/nvidia/llama-3.2-nv-embedqa-1b-v2/src /app/src
-COPY --from=builder /workspace/nim/nvidia/llama-3.2-nv-embedqa-1b-v2/triton /app/triton
-COPY --from=builder /workspace/nim/nvidia/llama-3.2-nv-embedqa-1b-v2/README.md README.md
-COPY --from=builder /workspace/nim/nvidia/llama-3.2-nv-embedqa-1b-v2/entrypoint.sh /app/entrypoint.sh
+COPY --from=builder /workspace/oim/nvidia/llama-3.2-nv-embedqa-1b-v2/src /app/src
+COPY --from=builder /workspace/oim/nvidia/llama-3.2-nv-embedqa-1b-v2/triton /app/triton
+COPY --from=builder /workspace/oim/nvidia/llama-3.2-nv-embedqa-1b-v2/README.md README.md
+COPY --from=builder /workspace/oim/nvidia/llama-3.2-nv-embedqa-1b-v2/entrypoint.sh /app/entrypoint.sh
 
 RUN chmod +x /app/entrypoint.sh \
     && groupadd -g 65532 appuser \

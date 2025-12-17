@@ -19,10 +19,10 @@ RUN git lfs install \
     && git clone https://huggingface.co/nvidia/nemotron-table-structure-v1 /opt/nemotron-table-structure-v1
 
 COPY pyproject.toml ./pyproject.toml
-COPY nim/common ./nim/common
-COPY nim/nvidia/nemoretriever-table-structure-v1 ./nim/nvidia/nemoretriever-table-structure-v1
+COPY oim/common ./oim/common
+COPY oim/nvidia/nemoretriever-table-structure-v1 ./oim/nvidia/nemoretriever-table-structure-v1
 
-WORKDIR /workspace/nim/nvidia/nemoretriever-table-structure-v1
+WORKDIR /workspace/oim/nvidia/nemoretriever-table-structure-v1
 
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --no-dev \
     && mv /workspace/.venv /opt/venv \
@@ -43,12 +43,12 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/venv /opt/venv
-COPY --from=builder /workspace/nim/nvidia/nemoretriever-table-structure-v1/src /app/src
-COPY --from=builder /workspace/nim/nvidia/nemoretriever-table-structure-v1/triton /app/triton
-COPY --from=builder /workspace/nim/nvidia/nemoretriever-table-structure-v1/README.md README.md
+COPY --from=builder /workspace/oim/nvidia/nemoretriever-table-structure-v1/src /app/src
+COPY --from=builder /workspace/oim/nvidia/nemoretriever-table-structure-v1/triton /app/triton
+COPY --from=builder /workspace/oim/nvidia/nemoretriever-table-structure-v1/README.md README.md
 
 EXPOSE 8000 8001 8002 8003 8100
 
 USER 65532:65532
 
-CMD ["uvicorn", "nemoretriever_table_structure_v1.server:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "oim_nemoretriever_table_structure_v1.server:app", "--host", "0.0.0.0", "--port", "8000"]

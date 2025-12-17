@@ -34,7 +34,7 @@ dependencies = [
 dev = ["pytest>=8.3.0", "ruff>=0.7.0", "mypy>=1.13.0"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/nemoretriever_page_elements_v3"]
+packages = ["src/oim_nemoretriever_page_elements_v3"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
@@ -43,4 +43,4 @@ allow-direct-references = true
 managed = true
 
 [tool.uv.sources]
-common = { workspace = true }
+oim-common = { workspace = true }

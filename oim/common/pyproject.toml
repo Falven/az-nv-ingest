@@ -13,6 +13,8 @@ authors = [{ name = "Open NV Ingest Maintainers" }]
 dependencies = [
   "anyio>=4.0.0,<5",
   "fastapi>=0.124.4",
+  "opentelemetry-exporter-otlp-proto-http>=1.39.0",
+  "opentelemetry-sdk>=1.39.0",
   "pydantic>=2.7.0",
   "pydantic-settings>=2.12.0",
   "prometheus-client>=0.20.0",
@@ -23,7 +25,7 @@ dependencies = [
 dev = ["pytest>=8.3.0", "ruff>=0.7.0", "mypy>=1.13.0"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/common"]
+packages = ["src/oim_common"]
 
 [tool.uv]
 managed = true

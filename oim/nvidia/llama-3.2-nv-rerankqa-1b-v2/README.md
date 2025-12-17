@@ -1,6 +1,6 @@
 # llama-3.2-nv-rerankqa-1b-v2 (open replacement)
 
-Reverse-engineered drop-in for the private `nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2` reranker. Lives under `nim/nvidia/llama-3.2-nv-rerankqa-1b-v2` to keep upstream sources untouched.
+Reverse-engineered drop-in for the private `nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2` reranker. Lives under `oim/nvidia/llama-3.2-nv-rerankqa-1b-v2` to keep upstream sources untouched.
 
 ## What nv-ingest expects
 
@@ -23,7 +23,7 @@ Prereqs: `docker` (preferred) or Python 3.10+ with `git-lfs`. The service ships 
 ### Docker (recommended)
 
 ```bash
-cd nim/nvidia/llama-3.2-nv-rerankqa-1b-v2
+cd oim/nvidia/llama-3.2-nv-rerankqa-1b-v2
 docker build -t llama-rerank-triton .
 docker run --gpus all -p 8000:8000 -p 8003:8003 llama-rerank-triton
 ```
@@ -31,14 +31,14 @@ docker run --gpus all -p 8000:8000 -p 8003:8003 llama-rerank-triton
 ### Manual start (API + Triton sidecar)
 
 ```bash
-cd nim/nvidia/llama-3.2-nv-rerankqa-1b-v2
+cd oim/nvidia/llama-3.2-nv-rerankqa-1b-v2
 python -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
 # start tritonserver in a separate shell
 tritonserver --model-repository=./triton/model_repository --http-port=8003 --grpc-port=8004 --metrics-port=8005 &
-TRITON_HTTP_ENDPOINT=http://127.0.0.1:8003 uvicorn llama_3_2_nv_rerankqa_1b_v2.server:app --host 0.0.0.0 --port ${NIM_HTTP_API_PORT:-8000}
+TRITON_HTTP_ENDPOINT=http://127.0.0.1:8003 uvicorn oim_llama_3_2_nv_rerankqa_1b_v2.server:app --host 0.0.0.0 --port ${NIM_HTTP_API_PORT:-8000}
 ```
 
 For development without downloading model weights, enable deterministic mock scoring for the Triton Python backend:
@@ -46,7 +46,7 @@ For development without downloading model weights, enable deterministic mock sco
 ```bash
 export ENABLE_MOCK_INFERENCE=1
 tritonserver --model-repository=./triton/model_repository --http-port=8003 --grpc-port=8004 --metrics-port=8005 &
-TRITON_HTTP_ENDPOINT=http://127.0.0.1:8003 uvicorn llama_3_2_nv_rerankqa_1b_v2.server:app --host 0.0.0.0 --port ${NIM_HTTP_API_PORT:-8000}
+TRITON_HTTP_ENDPOINT=http://127.0.0.1:8003 uvicorn oim_llama_3_2_nv_rerankqa_1b_v2.server:app --host 0.0.0.0 --port ${NIM_HTTP_API_PORT:-8000}
 ```
 
 Smoke test:

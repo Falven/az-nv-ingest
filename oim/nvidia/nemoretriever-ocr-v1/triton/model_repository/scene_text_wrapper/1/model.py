@@ -7,15 +7,15 @@ from typing import List, Sequence, cast
 import numpy as np
 import triton_python_backend_utils as pb_utils  # type: ignore[reportMissingImports]
 
-from nemoretriever_ocr_v1.errors import InvalidImageError, ModelLoadError
-from nemoretriever_ocr_v1.inference import (
+from oim_nemoretriever_ocr_v1.errors import InvalidImageError, ModelLoadError
+from oim_nemoretriever_ocr_v1.inference import (
     OCRModel,
     create_model,
     load_image_reference,
     run_ocr,
 )
-from nemoretriever_ocr_v1.models import ParsedPrediction
-from nemoretriever_ocr_v1.settings import MergeLevel, ServiceSettings
+from oim_nemoretriever_ocr_v1.models import ParsedPrediction
+from oim_nemoretriever_ocr_v1.settings import MergeLevel, ServiceSettings
 
 logger = logging.getLogger("scene_text_wrapper_backend")
 

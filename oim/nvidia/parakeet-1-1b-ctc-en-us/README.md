@@ -1,6 +1,6 @@
 # parakeet-1-1b-ctc-en-us (open replacement)
 
-Reverse-engineered drop-in for the private `nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us` Riva/Parakeet ASR NIM. Everything lives under `nim/nvidia/parakeet-1-1b-ctc-en-us` to keep upstream sources untouched.
+Reverse-engineered drop-in for the private `nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us` Riva/Parakeet ASR NIM. Everything lives under `oim/nvidia/parakeet-1-1b-ctc-en-us` to keep upstream sources untouched.
 
 ## What nv-ingest expects
 
@@ -56,7 +56,7 @@ Key envs mirrored from `docker-compose.yaml` / Helm values:
 Prereqs: Python 3.10+, git-lfs, and a compatible PyTorch build (install a CUDA wheel if you want GPU).
 
 ```bash
-cd nim/nvidia/parakeet-1-1b-ctc-en-us
+cd oim/nvidia/parakeet-1-1b-ctc-en-us
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -64,7 +64,7 @@ python -m pip install --upgrade pip
 python -m pip install torch --extra-index-url https://download.pytorch.org/whl/cu124  # adjust CUDA version as needed
 python -m pip install -r requirements.txt
 # Start FastAPI + gRPC; set ENABLE_DRY_RUN=1 to skip model download for quick e2e checks
-GRPC_PORT=50051 HTTP_PORT=9000 ENABLE_DRY_RUN=1 uvicorn parakeet_1_1b_ctc_en_us.server:app --host 0.0.0.0 --port 9000
+GRPC_PORT=50051 HTTP_PORT=9000 ENABLE_DRY_RUN=1 uvicorn oim_parakeet_1_1b_ctc_en_us.server:app --host 0.0.0.0 --port 9000
 ```
 
 Smoke test (requires `grpcurl`):

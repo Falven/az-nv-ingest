@@ -17,10 +17,10 @@ RUN apt-get update \
     && curl -LsSf https://astral.sh/uv/install.sh | sh
 
 COPY pyproject.toml ./pyproject.toml
-COPY nim/common ./nim/common
-COPY nim/nvidia/nemotron-nano-12b-v2-vl ./nim/nvidia/nemotron-nano-12b-v2-vl
+COPY oim/common ./oim/common
+COPY oim/nvidia/nemotron-nano-12b-v2-vl ./oim/nvidia/nemotron-nano-12b-v2-vl
 
-WORKDIR /workspace/nim/nvidia/nemotron-nano-12b-v2-vl
+WORKDIR /workspace/oim/nvidia/nemotron-nano-12b-v2-vl
 
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --no-dev \
     && mv /workspace/.venv /opt/venv
@@ -39,10 +39,10 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY --from=builder /opt/venv /opt/venv
-COPY --from=builder /workspace/nim/nvidia/nemotron-nano-12b-v2-vl/src /app/src
-COPY --from=builder /workspace/nim/nvidia/nemotron-nano-12b-v2-vl/triton /app/triton
-COPY --from=builder /workspace/nim/nvidia/nemotron-nano-12b-v2-vl/README.md README.md
-COPY --from=builder /workspace/nim/nvidia/nemotron-nano-12b-v2-vl/entrypoint.sh /app/entrypoint.sh
+COPY --from=builder /workspace/oim/nvidia/nemotron-nano-12b-v2-vl/src /app/src
+COPY --from=builder /workspace/oim/nvidia/nemotron-nano-12b-v2-vl/triton /app/triton
+COPY --from=builder /workspace/oim/nvidia/nemotron-nano-12b-v2-vl/README.md README.md
+COPY --from=builder /workspace/oim/nvidia/nemotron-nano-12b-v2-vl/entrypoint.sh /app/entrypoint.sh
 
 RUN chmod +x /app/entrypoint.sh \
     && groupadd -g 65532 appuser \

@@ -31,10 +31,10 @@ dependencies = [
 dev = ["pytest>=8.3.0", "ruff>=0.7.0", "mypy>=1.13.0"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/nemoretriever_ocr_v1"]
+packages = ["src/oim_nemoretriever_ocr_v1"]
 
 [tool.uv]
 managed = true
 
 [tool.uv.sources]
-common = { workspace = true }
+oim-common = { workspace = true }
