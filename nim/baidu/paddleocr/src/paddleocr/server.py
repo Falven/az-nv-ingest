@@ -166,7 +166,9 @@ async def infer_http(request: InferRequest) -> dict:
         logger.exception("Triton inference failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
 
-    outputs = result.as_numpy("OUTPUT") or []
+    outputs = result.as_numpy("OUTPUT")
+    if outputs is None:
+        outputs = []
     BATCH_SIZE.labels("http").observe(float(len(urls)))
     REQUEST_LATENCY.labels("http").observe(0.0)
     try:

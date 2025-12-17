@@ -27,9 +27,9 @@ from .settings import ServiceSettings
 logger = logging.getLogger(__name__)
 
 TRUNCATION_CODES: Dict[TruncationMode, int] = {
-    TruncationMode.NONE: 0,
-    TruncationMode.END: 1,
-    TruncationMode.START: 2,
+    "NONE": 0,
+    "END": 1,
+    "START": 2,
 }
 
 

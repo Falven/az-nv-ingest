@@ -25,6 +25,19 @@ class ServiceSettings(CommonSettings):
     max_streaming_sessions: int = Field(8, alias="MAX_STREAMING_SESSIONS")
     max_batch_size: int = Field(4, alias="MAX_BATCH_SIZE")
 
+    default_punctuation: bool = Field(True, alias="DEFAULT_PUNCTUATION")
+    default_diarization: bool = Field(False, alias="DEFAULT_DIARIZATION")
+    streaming_emit_interval_ms: int = Field(400, alias="STREAMING_EMIT_INTERVAL_MS")
+    endpoint_start_history_ms: int = Field(240, alias="ENDPOINT_START_HISTORY_MS")
+    endpoint_start_threshold: float = Field(0.6, alias="ENDPOINT_START_THRESHOLD")
+    endpoint_stop_history_ms: int = Field(1200, alias="ENDPOINT_STOP_HISTORY_MS")
+    endpoint_stop_threshold: float = Field(0.35, alias="ENDPOINT_STOP_THRESHOLD")
+    endpoint_eou_history_ms: int = Field(1600, alias="ENDPOINT_EOU_HISTORY_MS")
+    endpoint_eou_threshold: float = Field(0.2, alias="ENDPOINT_EOU_THRESHOLD")
+    vad_frame_ms: int = Field(30, alias="VAD_FRAME_MS")
+    max_speaker_count: int = Field(2, alias="MAX_SPEAKER_COUNT")
+    punctuation_model_id: str = Field("kredor/punctuate-all", alias="PUNCTUATION_MODEL_ID")
+
     metrics_namespace: str = Field("parakeet", alias="METRICS_NAMESPACE")
 
     triton_http_endpoint: str = Field(
@@ -44,6 +57,7 @@ class ServiceSettings(CommonSettings):
 
     otel_endpoint: str | None = Field(None, alias="OTEL_EXPORTER_OTLP_ENDPOINT")
     otel_service_name: str | None = Field("parakeet-asr", alias="OTEL_SERVICE_NAME")
+    enable_mock_inference: bool = Field(False, alias="ENABLE_MOCK_INFERENCE")
 
     @field_validator("additional_auth_tokens", mode="before")
     @classmethod

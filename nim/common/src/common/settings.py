@@ -9,7 +9,9 @@ class CommonSettings(BaseSettings):
     Base settings shared across NIM services.
     """
 
-    model_config = SettingsConfigDict(populate_by_name=True, extra="ignore")
+    model_config = SettingsConfigDict(
+        populate_by_name=True, extra="ignore", cli_parse_args=False
+    )
 
     log_level: str = Field("INFO", alias="LOG_LEVEL")
     require_auth: bool = Field(True, alias="NIM_REQUIRE_AUTH")

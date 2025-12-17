@@ -26,6 +26,7 @@ dependencies = [
   "scipy==1.16.3",
   "torch==2.8.0",
   "transformers==4.57.3",
+  "tenacity==9.0.0",
   "tritonclient[grpc]==2.63.0; platform_system == \"Linux\"",
   "tritonclient[grpc]==2.60.0; platform_system != \"Linux\"",
   "uvicorn==0.32.1",

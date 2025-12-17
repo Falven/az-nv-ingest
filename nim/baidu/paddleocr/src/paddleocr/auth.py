@@ -9,13 +9,17 @@ from fastapi import Depends, Request
 from .settings import ServiceSettings
 
 
+def _get_settings() -> ServiceSettings:
+    return ServiceSettings()
+
+
 def _allowed_tokens(settings: ServiceSettings):
     tokens = settings.allowed_tokens()
     return tokens
 
 
 async def require_http_auth(
-    request: Request, settings: ServiceSettings = Depends()
+    request: Request, settings: ServiceSettings = Depends(_get_settings)
 ) -> None:
     ensure_authorized(request, _allowed_tokens(settings), settings.require_auth)
 
