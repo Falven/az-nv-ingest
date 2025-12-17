@@ -43,9 +43,10 @@ COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /workspace/oim/baidu/paddleocr/src /app/src
 COPY --from=builder /workspace/oim/baidu/paddleocr/README.md README.md
 COPY --from=builder /workspace/oim/baidu/paddleocr/triton/model_repository /models
+COPY --from=builder /workspace/oim/common/entrypoint.sh /app/common-entrypoint.sh
 COPY --from=builder /workspace/oim/baidu/paddleocr/entrypoint.sh /app/entrypoint.sh
 
-RUN chmod +x /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh /app/common-entrypoint.sh
 
 EXPOSE 8000 8500 8501 8502
 

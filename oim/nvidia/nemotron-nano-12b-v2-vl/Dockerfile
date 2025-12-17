@@ -42,9 +42,10 @@ COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /workspace/oim/nvidia/nemotron-nano-12b-v2-vl/src /app/src
 COPY --from=builder /workspace/oim/nvidia/nemotron-nano-12b-v2-vl/triton /app/triton
 COPY --from=builder /workspace/oim/nvidia/nemotron-nano-12b-v2-vl/README.md README.md
+COPY --from=builder /workspace/oim/common/entrypoint.sh /app/common-entrypoint.sh
 COPY --from=builder /workspace/oim/nvidia/nemotron-nano-12b-v2-vl/entrypoint.sh /app/entrypoint.sh
 
-RUN chmod +x /app/entrypoint.sh \
+RUN chmod +x /app/entrypoint.sh /app/common-entrypoint.sh \
     && groupadd -g 65532 appuser \
     && useradd -u 65532 -g 65532 -m appuser
 

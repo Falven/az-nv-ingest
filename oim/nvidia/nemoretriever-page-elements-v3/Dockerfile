@@ -41,7 +41,10 @@ COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /workspace/oim/nvidia/nemoretriever-page-elements-v3/src /app/src
 COPY --from=builder /workspace/oim/nvidia/nemoretriever-page-elements-v3/triton /app/triton
 COPY --from=builder /workspace/oim/nvidia/nemoretriever-page-elements-v3/README.md README.md
+COPY --from=builder /workspace/oim/common/entrypoint.sh /app/common-entrypoint.sh
 COPY --from=builder /workspace/oim/nvidia/nemoretriever-page-elements-v3/entrypoint.sh /app/entrypoint.sh
+
+RUN chmod +x /app/entrypoint.sh /app/common-entrypoint.sh
 
 EXPOSE 8000 8001 8002 8003 8100
 

@@ -42,9 +42,10 @@ COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /workspace/oim/nvidia/parakeet-1-1b-ctc-en-us/src /app/src
 COPY --from=builder /workspace/oim/nvidia/parakeet-1-1b-ctc-en-us/triton /app/triton
 COPY --from=builder /workspace/oim/nvidia/parakeet-1-1b-ctc-en-us/README.md README.md
+COPY --from=builder /workspace/oim/common/entrypoint.sh /app/common-entrypoint.sh
 COPY --from=builder /workspace/oim/nvidia/parakeet-1-1b-ctc-en-us/entrypoint.sh /app/entrypoint.sh
 
-RUN chmod +x /app/entrypoint.sh \
+RUN chmod +x /app/entrypoint.sh /app/common-entrypoint.sh \
     && groupadd -g 65532 appuser \
     && useradd -u 65532 -g 65532 -m appuser
 
