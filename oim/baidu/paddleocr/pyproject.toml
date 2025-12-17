@@ -3,7 +3,7 @@ requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "paddleocr"
+name = "oim-paddleocr"
 version = "0.1.0"
 description = "Open replacement for paddleocr NIM packaged for uv."
 readme = "README.md"
@@ -18,7 +18,7 @@ dependencies = [
   "opentelemetry-api==1.39.1",
   "opentelemetry-exporter-otlp-proto-http==1.39.1",
   "opentelemetry-sdk==1.39.1",
-  "common>=0.1.0",
+  "oim-common>=0.1.0",
   "paddlepaddle==3.2.1",
   "paddleocr==3.3.2",
   "paddlex[ocr]==3.3.11",

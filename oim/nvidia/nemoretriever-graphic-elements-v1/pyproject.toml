@@ -3,7 +3,7 @@ requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "nemoretriever-graphic-elements-v1"
+name = "oim-nemoretriever-graphic-elements-v1"
 version = "0.1.0"
 description = "Open replacement for nemoretriever-graphic-elements-v1 packaged for uv."
 readme = "README.md"
@@ -11,7 +11,7 @@ requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Open NV Ingest Maintainers" }]
 dependencies = [
-  "common>=0.1.0",
+  "oim-common>=0.1.0",
   "fastapi==0.124.4",
   "grpcio==1.67.1",
   "nemotron-graphic-elements-v1 @ git+https://huggingface.co/nvidia/nemotron-graphic-elements-v1",

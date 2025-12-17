@@ -1,13 +1,13 @@
 [tool.uv.workspace]
 members = [
-  "nim/common",
-  "nim/nvidia/llama-3.2-nv-embedqa-1b-v2",
-  "nim/nvidia/llama-3.2-nv-rerankqa-1b-v2",
-  "nim/nvidia/nemoretriever-page-elements-v3",
-  "nim/nvidia/nemoretriever-graphic-elements-v1",
-  "nim/nvidia/nemoretriever-table-structure-v1",
-  "nim/nvidia/nemoretriever-ocr-v1",
-  "nim/nvidia/nemotron-nano-12b-v2-vl",
-  "nim/nvidia/parakeet-1-1b-ctc-en-us",
-  "nim/baidu/paddleocr",
+  "oim/common",
+  "oim/nvidia/llama-3.2-nv-embedqa-1b-v2",
+  "oim/nvidia/llama-3.2-nv-rerankqa-1b-v2",
+  "oim/nvidia/nemoretriever-page-elements-v3",
+  "oim/nvidia/nemoretriever-graphic-elements-v1",
+  "oim/nvidia/nemoretriever-table-structure-v1",
+  "oim/nvidia/nemoretriever-ocr-v1",
+  "oim/nvidia/nemotron-nano-12b-v2-vl",
+  "oim/nvidia/parakeet-1-1b-ctc-en-us",
+  "oim/baidu/paddleocr",
 ]

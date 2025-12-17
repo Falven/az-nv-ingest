@@ -3,7 +3,7 @@ requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "common"
+name = "oim-common"
 version = "0.1.0"
 description = "Shared utilities for open NIM services (auth, logging, settings)."
 readme = "README.md"
