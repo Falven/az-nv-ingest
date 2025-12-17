@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "parakeet-1-1b-ctc-en-us"
+version = "0.1.0"
+description = "Open replacement for parakeet-1-1b-ctc-en-us packaged for uv."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Open NV Ingest Maintainers" }]
+dependencies = [
+  "deepmultilingualpunctuation==1.0.1",
+  "fastapi==0.115.6",
+  "grpcio==1.67.1",
+  "nvidia-riva-client==2.23.0",
+  "numpy==2.3.5",
+  "opentelemetry-api==1.39.1",
+  "opentelemetry-exporter-otlp-proto-http==1.39.1",
+  "opentelemetry-sdk==1.39.1",
+  "common>=0.1.0",
+  "pydantic-settings==2.11.0",
+  "pydantic==2.12.5",
+  "prometheus-client==0.23.1",
+  "scipy==1.16.3",
+  "torch==2.8.0",
+  "transformers==4.57.3",
+  "tritonclient[grpc]==2.63.0; platform_system == \"Linux\"",
+  "tritonclient[grpc]==2.60.0; platform_system != \"Linux\"",
+  "uvicorn==0.32.1",
+  "webrtcvad==2.0.10",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3.0", "ruff>=0.7.0", "mypy>=1.13.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/parakeet_1_1b_ctc_en_us"]
+
+[tool.uv]
+managed = true
+
+[tool.uv.sources]
+common = { workspace = true }

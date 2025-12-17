@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "common"
+version = "0.1.0"
+description = "Shared utilities for open NIM services (auth, logging, settings)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Open NV Ingest Maintainers" }]
+dependencies = [
+  "fastapi>=0.115.6",
+  "pydantic>=2.7.0",
+  "pydantic-settings>=2.2.0",
+  "prometheus-client>=0.20.0",
+  "opentelemetry-api>=1.27.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3.0", "ruff>=0.7.0", "mypy>=1.13.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/common"]
+
+[tool.uv]
+managed = true

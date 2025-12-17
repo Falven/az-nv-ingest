@@ -65,7 +65,8 @@ dependencies = [
     "opencv-python", # For some reason conda cant solve our req set with py-opencv so we need to use pip
     "pymilvus>=2.5.10",
     "pymilvus[bulk_writer, model]",
-    "tritonclient",
+    "tritonclient==2.63.0; platform_system == \"Linux\"",
+    "tritonclient==2.60.0; platform_system != \"Linux\"",
     "nvidia-riva-client==2.20.0",
     "unstructured-client",
     "markitdown",

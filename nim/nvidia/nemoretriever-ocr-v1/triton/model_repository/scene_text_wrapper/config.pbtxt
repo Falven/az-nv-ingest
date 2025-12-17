@@ -1,0 +1,25 @@
+name: "scene_text_wrapper"
+backend: "python"
+max_batch_size: 8
+input [
+  {
+    name: "INPUT_IMAGE_URLS"
+    data_type: TYPE_BYTES
+    dims: [ 1 ]
+  },
+  {
+    name: "MERGE_LEVELS"
+    data_type: TYPE_BYTES
+    dims: [ 1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT"
+    data_type: TYPE_BYTES
+    dims: [ 3 ]
+  }
+]
+instance_group [
+  { kind: KIND_GPU }
+]

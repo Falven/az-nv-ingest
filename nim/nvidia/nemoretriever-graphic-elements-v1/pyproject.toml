@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nemoretriever-graphic-elements-v1"
+version = "0.1.0"
+description = "Open replacement for nemoretriever-graphic-elements-v1 packaged for uv."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Open NV Ingest Maintainers" }]
+dependencies = [
+  "common>=0.1.0",
+  "fastapi==0.124.4",
+  "grpcio==1.67.1",
+  "nemotron-graphic-elements-v1 @ git+https://huggingface.co/nvidia/nemotron-graphic-elements-v1",
+  "numpy==2.3.5",
+  "pillow==12.0.0",
+  "prometheus-client==0.23.1",
+  "pydantic-settings==2.12.0",
+  "pydantic==2.12.5",
+  "requests==2.32.5",
+  "tenacity==9.0.0",
+  "torch==2.8.0",
+  "torchvision==0.23.0",
+  "tritonclient[grpc]==2.63.0",
+  "uvicorn[standard]==0.38.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3.0", "ruff>=0.7.0", "mypy>=1.13.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nemoretriever_graphic_elements_v1"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.uv]
+managed = true
+
+[tool.uv.sources]
+common = { workspace = true }

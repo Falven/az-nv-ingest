@@ -1,0 +1,96 @@
+name: "parakeet_1_1b_ctc_en_us"
+backend: "python"
+max_batch_size: 0
+
+input [
+  {
+    name: "AUDIO"
+    data_type: TYPE_BYTES
+    dims: [ -1 ]
+  },
+  {
+    name: "SAMPLE_RATE"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+    optional: true
+  },
+  {
+    name: "ENCODING"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+    optional: true
+  },
+  {
+    name: "CHANNELS"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+    optional: true
+  },
+  {
+    name: "ENABLE_PUNCTUATION"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+    optional: true
+  },
+  {
+    name: "ENABLE_WORD_OFFSETS"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+    optional: true
+  },
+  {
+    name: "ENABLE_DIARIZATION"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+    optional: true
+  },
+  {
+    name: "MAX_SPEAKER_COUNT"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+    optional: true
+  }
+]
+
+output [
+  {
+    name: "TRANSCRIPT"
+    data_type: TYPE_BYTES
+    dims: [ 1 ]
+  },
+  {
+    name: "WORD_OFFSETS"
+    data_type: TYPE_BYTES
+    dims: [ 1 ]
+  },
+  {
+    name: "AUDIO_PROCESSED"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  }
+]
+
+instance_group [
+  {
+    kind: KIND_AUTO
+  }
+]
+
+default_model_filename: "model.py"
+
+parameters: {
+  key: "model_id"
+  value: { string_value: "nvidia/parakeet-ctc-1.1b" }
+}
+parameters: {
+  key: "punctuation_model_id"
+  value: { string_value: "kredor/punctuate-all" }
+}
+parameters: {
+  key: "target_sample_rate"
+  value: { string_value: "16000" }
+}
+parameters: {
+  key: "enable_mock_inference"
+  value: { string_value: "0" }
+}

@@ -1,0 +1,51 @@
+name: "llama_3_2_nv_rerankqa_1b_v2"
+backend: "python"
+max_batch_size: 64
+
+input [
+  {
+    name: "QUERY"
+    data_type: TYPE_BYTES
+    dims: [ 1 ]
+  },
+  {
+    name: "PASSAGES"
+    data_type: TYPE_BYTES
+    dims: [ -1 ]
+  },
+  {
+    name: "TRUNCATE"
+    data_type: TYPE_INT32
+    dims: [ 1 ]
+    optional: true
+  }
+]
+
+output [
+  {
+    name: "SCORES"
+    data_type: TYPE_FP32
+    dims: [ -1 ]
+  }
+]
+
+instance_group [
+  {
+    kind: KIND_AUTO
+  }
+]
+
+default_model_filename: "model.py"
+
+parameters: {
+  key: "model_id"
+  value: { string_value: "nvidia/llama-3.2-nv-rerankqa-1b-v2" }
+}
+parameters: {
+  key: "max_sequence_length"
+  value: { string_value: "8192" }
+}
+parameters: {
+  key: "enable_mock_inference"
+  value: { string_value: "0" }
+}

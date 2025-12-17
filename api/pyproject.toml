@@ -28,7 +28,8 @@ dependencies = [
     "fsspec>=2025.5.1",
     "universal_pathlib>=0.2.6",
     "ffmpeg-python==0.2.0",
-    "tritonclient",
+    "tritonclient==2.63.0; platform_system == \"Linux\"",
+    "tritonclient==2.60.0; platform_system != \"Linux\"",
     "glom",
 ]
 

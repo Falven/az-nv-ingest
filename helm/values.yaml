@@ -146,8 +146,6 @@ tmpDirSize: 50Gi
 ## @param envVars.COMPONENTS_TO_READY_CHECK [default: "ALL"] Components to check during readiness probe
 ## @param envVars.MODEL_PREDOWNLOAD_PATH [default: "/workspace/models/"] Path for pre-downloading models
 envVars:
-  INGEST_LOG_LEVEL: "DEFAULT"
-
   ARROW_DEFAULT_MEMORY_POOL: "system"
   OMP_NUM_THREADS: 1
   RAY_num_grpc_threads: 1
@@ -682,8 +680,6 @@ nimOperator:
         value: "32"
       - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
         value: "2048"
-      - name: NIM_TRITON_CPU_THREADS_PRE_PROCESSOR
-        value: "2"
       - name: OMP_NUM_THREADS
         value: "2"
       - name: NIM_TRITON_CPU_THREADS_PRE_PROCESSOR

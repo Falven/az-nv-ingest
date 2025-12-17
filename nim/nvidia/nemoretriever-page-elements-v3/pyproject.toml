@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nemoretriever-page-elements-v3"
+version = "0.1.0"
+description = "Open replacement for nemoretriever-page-elements-v3 packaged for uv."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Open NV Ingest Maintainers" }]
+dependencies = [
+  "fastapi==0.124.4",
+  "grpcio==1.67.1",
+  "nemotron-page-elements-v3 @ git+https://huggingface.co/nvidia/nemotron-page-elements-v3",
+  "numpy==2.3.5",
+  "opentelemetry-api==1.39.1",
+  "opentelemetry-exporter-otlp-proto-http==1.39.1",
+  "opentelemetry-sdk==1.39.1",
+  "common>=0.1.0",
+  "pillow==12.0.0",
+  "prometheus-client==0.23.1",
+  "pydantic-settings==2.12.0",
+  "pydantic==2.12.5",
+  "requests==2.32.5",
+  "tenacity==9.0.0",
+  "torch==2.8.0",
+  "tritonclient[grpc]==2.63.0; platform_system == \"Linux\"",
+  "tritonclient[grpc]==2.60.0; platform_system != \"Linux\"",
+  "uvicorn[standard]==0.38.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3.0", "ruff>=0.7.0", "mypy>=1.13.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nemoretriever_page_elements_v3"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.uv]
+managed = true
+
+[tool.uv.sources]
+common = { workspace = true }
