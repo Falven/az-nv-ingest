@@ -6,6 +6,7 @@ from contextlib import nullcontext
 from typing import Any, Dict
 
 from common.logging import configure_logging
+from common.rate_limit import AsyncRateLimiter
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 
@@ -18,7 +19,6 @@ from .metrics import (
     track_inflight,
 )
 from .models import EmbeddingsRequest
-from .rate_limit import AsyncRateLimiter
 from .settings import ServiceSettings
 from .telemetry import configure_tracer
 

@@ -4,6 +4,7 @@ from common.auth import (
     extract_token_with_fallback,
 )
 from common.logging import configure_logging, get_logger
+from common.rate_limit import AsyncRateLimiter, SyncRateLimiter
 from common.settings import CommonSettings
 
 __all__ = [
@@ -13,4 +14,6 @@ __all__ = [
     "extract_bearer_token",
     "extract_token_with_fallback",
     "get_logger",
+    "AsyncRateLimiter",
+    "SyncRateLimiter",
 ]

@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager, nullcontext
 from typing import Any, Mapping
 
 from common.logging import configure_logging
+from common.rate_limit import AsyncRateLimiter
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import ValidationError
@@ -14,7 +15,6 @@ from pydantic import ValidationError
 from .auth import require_http_auth
 from .clients.triton_client import TritonCaptionClient
 from .inference import (
-    AsyncRateLimiter,
     generate_caption,
     prepare_request,
     stream_caption,

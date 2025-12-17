@@ -5,7 +5,6 @@ import base64
 import io
 import json
 import logging
-from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from fastapi import HTTPException, status
@@ -13,11 +12,11 @@ from PIL import Image
 
 from .clients.triton_client import TritonCaptionClient, TritonCaptionRequest
 from .models import (
+    MAX_DATA_URL_CHARS,
     ChatMessage,
     ChatRequest,
     MessageContent,
     ParsedRequest,
-    MAX_DATA_URL_CHARS,
 )
 from .settings import (
     DEFAULT_SYSTEM_PROMPT,
@@ -26,29 +25,6 @@ from .settings import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-class AsyncRateLimiter:
-    """
-    Lightweight async semaphore wrapper for request limiting.
-    """
-
-    def __init__(self, max_concurrent: int | None) -> None:
-        self._sem = asyncio.Semaphore(max_concurrent) if max_concurrent else None
-
-    @asynccontextmanager
-    async def limit(self) -> AsyncIterator[None]:
-        """
-        Guard an async block with the configured semaphore.
-        """
-        if self._sem is None:
-            yield
-            return
-        await self._sem.acquire()
-        try:
-            yield
-        finally:
-            self._sem.release()
 
 
 def _decode_image_url(data_url: str) -> bytes:

@@ -5,14 +5,15 @@ import time
 from typing import Optional
 
 from common.logging import configure_logging
+from common.rate_limit import AsyncRateLimiter
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import JSONResponse, Response
 
 from .auth import require_http_auth
 from .clients.triton_client import TritonClient
 from .errors import (
-    InvalidImageError,
     InferenceError,
+    InvalidImageError,
     TritonInferenceError,
     TritonStartupError,
 )
@@ -24,7 +25,6 @@ from .metrics import (
     track_inflight,
 )
 from .models import InferRequest
-from .rate_limit import AsyncRateLimiter
 from .settings import ServiceSettings
 from .telemetry import configure_tracer
 from .triton_server import TritonServer
