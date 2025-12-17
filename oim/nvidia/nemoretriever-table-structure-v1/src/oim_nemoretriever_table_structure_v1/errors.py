@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from oim_common.errors import InferenceError, InvalidImageError
 
-class InvalidImageError(ValueError):
-    """Raised when an input image cannot be decoded."""
-
-
-class InferenceError(RuntimeError):
-    """Raised for unexpected failures during inference preparation."""
+__all__ = [
+    "InvalidImageError",
+    "InferenceError",
+    "TritonInferenceError",
+    "TritonStartupError",
+]
 
 
 class TritonInferenceError(RuntimeError):

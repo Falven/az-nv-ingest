@@ -28,9 +28,6 @@ class ServiceSettings(CommonSettings):
     triton_model_repository: str = Field(
         "/app/triton/model_repository", alias="TRITON_MODEL_REPOSITORY"
     )
-    triton_server_bin: str = Field(
-        "/opt/tritonserver/bin/tritonserver", alias="TRITON_SERVER_BIN"
-    )
     triton_model_name: str = Field("yolox_ensemble", alias="TRITON_MODEL_NAME")
     max_batch_size: int = Field(
         DEFAULT_MAX_BATCH_SIZE, alias="NIM_TRITON_MAX_BATCH_SIZE"

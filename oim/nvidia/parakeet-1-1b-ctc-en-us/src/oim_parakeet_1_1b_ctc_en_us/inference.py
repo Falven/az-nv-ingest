@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, TypeAlias
 
 import numpy as np
 from fastapi import HTTPException, status
+from oim_common.audio import pcm16_to_float32
 from riva.client.proto import riva_asr_pb2 as rasr
 from tenacity import (
     retry,
@@ -342,7 +343,9 @@ class VadDetector:
     def __init__(self, frame_ms: int):
         self.frame_ms = max(1, int(frame_ms))
 
-    def probabilities(self, audio: np.ndarray, sample_rate: int) -> Tuple[List[float], float]:
+    def probabilities(
+        self, audio: np.ndarray, sample_rate: int
+    ) -> Tuple[List[float], float]:
         """
         Return uniform VAD probabilities for the provided audio.
         """
@@ -387,11 +390,15 @@ class ParakeetASRBackend:
         self._last_config = config
         if not payload:
             raise ValueError("audio payload is empty")
-        audio_values = np.frombuffer(payload, dtype=np.int16)
+        audio_values = pcm16_to_float32(payload)
         if audio_values.size == 0:
             raise ValueError("audio payload contained no samples")
-        normalized = audio_values.astype(np.float32) / 32768.0
-        sample_rate = int(config.sample_rate_hertz) if config.sample_rate_hertz > 0 else self.sample_rate
+        normalized = audio_values
+        sample_rate = (
+            int(config.sample_rate_hertz)
+            if config.sample_rate_hertz > 0
+            else self.sample_rate
+        )
         duration_seconds = (
             float(normalized.shape[0]) / float(sample_rate) if sample_rate > 0 else 0.0
         )
@@ -417,7 +424,9 @@ class ParakeetASRBackend:
         """
         config = self._last_config or rasr.RecognitionConfig()
         sample_rate = (
-            int(config.sample_rate_hertz) if config.sample_rate_hertz > 0 else self.sample_rate
+            int(config.sample_rate_hertz)
+            if config.sample_rate_hertz > 0
+            else self.sample_rate
         )
         if not self._use_mock and self._triton is not None:
             config.enable_word_time_offsets = bool(include_word_offsets)
@@ -447,7 +456,9 @@ class ParakeetASRBackend:
             ]
         response = rasr.SpeechRecognitionResult()
         alternative = response.alternatives.add()
-        alternative.transcript = transcript if enable_punctuation else transcript.rstrip(".")
+        alternative.transcript = (
+            transcript if enable_punctuation else transcript.rstrip(".")
+        )
         alternative.confidence = 0.0
         if include_word_offsets:
             alternative.words.extend(self.word_infos(offsets, None))
@@ -535,7 +546,9 @@ def config_to_options(
     """
     Normalize a RecognitionConfig into RecognitionOptions with defaults applied.
     """
-    sample_rate = int(config.sample_rate_hertz) if config.sample_rate_hertz > 0 else 16000
+    sample_rate = (
+        int(config.sample_rate_hertz) if config.sample_rate_hertz > 0 else 16000
+    )
     language_code = config.language_code or settings.default_language_code
     include_word_offsets = bool(config.enable_word_time_offsets)
     enable_punctuation = bool(
@@ -622,7 +635,10 @@ def update_endpointing_state(
             probability < endpointing.stop_threshold for probability in vad_probs
         ):
             state.last_silence_time = state.total_audio_seconds
-    if state.speech_started and state.total_audio_seconds >= endpointing.max_history_seconds:
+    if (
+        state.speech_started
+        and state.total_audio_seconds >= endpointing.max_history_seconds
+    ):
         state.endpoint_triggered = True
 
 

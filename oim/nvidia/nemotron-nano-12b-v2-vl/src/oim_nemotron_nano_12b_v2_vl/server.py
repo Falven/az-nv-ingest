@@ -28,8 +28,6 @@ from .inference import (
 )
 from .models import ChatChoice, ChatMessageResponse, ChatRequest, ChatResponse
 from .settings import ServiceSettings
-from .triton_server import TritonServer
-
 settings = ServiceSettings()
 configure_logging(settings.logging_level)
 logger = logging.getLogger("nemotron-nano-12b-v2-vl")
@@ -40,7 +38,6 @@ tracer = configure_tracer(
 )
 rate_limiter = AsyncRateLimiter(settings.rate_limit)
 auth_dependency = require_http_auth(settings)
-triton_server = TritonServer(settings)
 triton_client: TritonCaptionClient | None = None
 startup_error: str | None = None
 
@@ -76,7 +73,6 @@ async def _lifespan(_app: FastAPI):
     global triton_client, startup_error
     start_metrics_server(settings.metrics_port, settings.auth_required)
     try:
-        await triton_server.start()
         client = TritonCaptionClient(settings)
         await client.wait_for_ready()
         triton_client = client
@@ -87,10 +83,6 @@ async def _lifespan(_app: FastAPI):
     if triton_client is not None:
         triton_client.close()
         triton_client = None
-    try:
-        await triton_server.stop()
-    except Exception:
-        logger.debug("Error during Triton shutdown", exc_info=True)
 
 
 app = FastAPI(

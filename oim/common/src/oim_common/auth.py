@@ -1,8 +1,13 @@
 from __future__ import annotations
 
-from typing import Iterable, Mapping, Set
+from typing import Iterable, Mapping, MutableMapping, Optional, Protocol, Set
 
-from fastapi import HTTPException, Request, status
+try:  # pragma: no cover - optional dependency
+    import grpc
+except Exception:  # pragma: no cover - optional dependency
+    grpc = None  # type: ignore[assignment]
+
+from fastapi import Depends, HTTPException, Request, status
 
 
 def extract_bearer_token(headers: Mapping[str, str]) -> str | None:
@@ -62,6 +67,152 @@ def ensure_authorized(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="invalid authorization token",
         )
+
+
+class AuthSettings(Protocol):
+    """
+    Minimal auth configuration required to build HTTP/gRPC dependencies.
+    """
+
+    auth_tokens: Set[str]
+    auth_required: bool
+
+
+def build_http_auth_dependency(
+    settings: AuthSettings,
+    *,
+    allow_unauthenticated_paths: Optional[Set[str]] = None,
+) -> Depends:
+    """
+    Construct a FastAPI dependency enforcing bearer authentication.
+
+    Args:
+        settings: Settings object exposing ``auth_tokens`` and ``auth_required``.
+        allow_unauthenticated_paths: Set of request paths that may skip auth
+            when authentication is disabled.
+
+    Returns:
+        FastAPI ``Depends`` marker for route dependencies.
+    """
+
+    allowed_paths = allow_unauthenticated_paths or set()
+    tokens = set(settings.auth_tokens)
+    require_auth = bool(settings.auth_required)
+
+    async def _dependency(request: Request) -> None:
+        allowlisted = request.url.path in allowed_paths
+        if allowlisted and not require_auth:
+            return
+        ensure_authorized(request, tokens, require_auth)
+
+    return Depends(_dependency)
+
+
+class AuthValidator:
+    """
+    Validates bearer and NGC tokens for gRPC metadata or HTTP headers.
+    """
+
+    def __init__(self, settings: AuthSettings):
+        self.allowed_tokens = set(settings.auth_tokens)
+        self.enabled = bool(settings.auth_required)
+
+    def validate_metadata(
+        self, metadata: Mapping[str, str], allow_unauthenticated: bool = False
+    ) -> None:
+        if not self.enabled or allow_unauthenticated:
+            return
+        token = extract_token_with_fallback(metadata)
+        if token and (not self.allowed_tokens or token in self.allowed_tokens):
+            return
+        raise PermissionError("authentication failed")
+
+    def validate_headers(
+        self, headers: Mapping[str, str], allow_unauthenticated: bool = False
+    ) -> None:
+        if not self.enabled or allow_unauthenticated:
+            return
+        token = extract_token_with_fallback(headers)
+        if token and (not self.allowed_tokens or token in self.allowed_tokens):
+            return
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="authentication required",
+        )
+
+
+class AuthInterceptor:  # pragma: no cover - thin gRPC wrapper
+    """
+    gRPC interceptor enforcing metadata authentication.
+    """
+
+    def __init__(self, validator: AuthValidator):
+        if grpc is None:
+            raise RuntimeError("grpcio is required for AuthInterceptor")
+        self.validator = validator
+
+    def intercept_service(self, continuation, handler_call_details):  # type: ignore[override]
+        handler = continuation(handler_call_details)
+        if handler is None or not self.validator.enabled:
+            return handler
+
+        def metadata_from_context(context) -> MutableMapping[str, str]:
+            return {
+                key.lower(): value
+                for key, value in (context.invocation_metadata() or [])
+            }
+
+        def enforce_auth(context) -> None:
+            try:
+                self.validator.validate_metadata(metadata_from_context(context))
+            except PermissionError as exc:
+                context.abort(grpc.StatusCode.UNAUTHENTICATED, str(exc))
+
+        if handler.unary_unary:
+
+            def unary_unary(request, context):  # type: ignore[no-untyped-def]
+                enforce_auth(context)
+                return handler.unary_unary(request, context)
+
+            return grpc.unary_unary_rpc_method_handler(
+                unary_unary,
+                request_deserializer=handler.request_deserializer,
+                response_serializer=handler.response_serializer,
+            )
+        if handler.stream_unary:
+
+            def stream_unary(request_iter, context):  # type: ignore[no-untyped-def]
+                enforce_auth(context)
+                return handler.stream_unary(request_iter, context)
+
+            return grpc.stream_unary_rpc_method_handler(
+                stream_unary,
+                request_deserializer=handler.request_deserializer,
+                response_serializer=handler.response_serializer,
+            )
+        if handler.unary_stream:
+
+            def unary_stream(request, context):  # type: ignore[no-untyped-def]
+                enforce_auth(context)
+                return handler.unary_stream(request, context)
+
+            return grpc.unary_stream_rpc_method_handler(
+                unary_stream,
+                request_deserializer=handler.request_deserializer,
+                response_serializer=handler.response_serializer,
+            )
+        if handler.stream_stream:
+
+            def stream_stream(request_iter, context):  # type: ignore[no-untyped-def]
+                enforce_auth(context)
+                return handler.stream_stream(request_iter, context)
+
+            return grpc.stream_stream_rpc_method_handler(
+                stream_stream,
+                request_deserializer=handler.request_deserializer,
+                response_serializer=handler.response_serializer,
+            )
+        return handler
 
 
 def extract_token_with_fallback(headers: Mapping[str, str]) -> str | None:

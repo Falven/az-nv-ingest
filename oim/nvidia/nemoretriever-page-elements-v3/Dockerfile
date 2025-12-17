@@ -41,9 +41,10 @@ COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /workspace/oim/nvidia/nemoretriever-page-elements-v3/src /app/src
 COPY --from=builder /workspace/oim/nvidia/nemoretriever-page-elements-v3/triton /app/triton
 COPY --from=builder /workspace/oim/nvidia/nemoretriever-page-elements-v3/README.md README.md
+COPY --from=builder /workspace/oim/nvidia/nemoretriever-page-elements-v3/entrypoint.sh /app/entrypoint.sh
 
 EXPOSE 8000 8001 8002 8003 8100
 
 USER 65532:65532
 
-CMD ["uvicorn", "oim_nemoretriever_page_elements_v3.server:app", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["bash", "/app/entrypoint.sh"]

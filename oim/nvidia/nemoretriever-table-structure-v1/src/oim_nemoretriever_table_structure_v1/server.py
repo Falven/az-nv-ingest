@@ -16,21 +16,14 @@ from fastapi.responses import JSONResponse, Response
 
 from .auth import require_http_auth
 from .clients.triton_client import TritonClient
-from .errors import (
-    InvalidImageError,
-    InferenceError,
-    TritonInferenceError,
-    TritonStartupError,
-)
+from .errors import InvalidImageError, InferenceError, TritonInferenceError
 from .inference import encode_request_images, format_http_predictions
 from .models import InferRequest
 from .settings import ServiceSettings
-from .triton_server import TritonServer
 
 settings = ServiceSettings()
 configure_logging(settings.effective_log_level)
 logger = logging.getLogger(settings.model_name)
-triton_server = TritonServer(settings)
 triton_client: Optional[TritonClient] = None
 auth_dependency = Depends(require_http_auth(settings))
 
@@ -39,18 +32,12 @@ async def _lifespan(_app: FastAPI):
     """Manage startup and shutdown tasks for the FastAPI app."""
     global triton_client
     start_metrics_server(settings.metrics_port, settings.auth_required)
-    try:
-        await triton_server.start()
-    except TritonStartupError as exc:
-        logger.error("Failed to start Triton: %s", exc)
-        raise
     triton_client = TritonClient(settings)
     await triton_client.wait_for_model_ready()
     yield
     if triton_client is not None:
         triton_client.close()
         triton_client = None
-    await triton_server.stop()
 
 
 app = FastAPI(
@@ -180,7 +167,12 @@ async def infer(request_body: InferRequest) -> JSONResponse:
         )
 
     try:
-        images = await encode_request_images(request_body.input)
+        images = await encode_request_images(
+            request_body.input,
+            settings.request_timeout_seconds,
+            allow_remote=False,
+            allow_file=False,
+        )
     except InvalidImageError as exc:
         record_request("http", endpoint, "invalid_payload", start_time)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
