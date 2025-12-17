@@ -5,7 +5,7 @@ from typing import Any, Dict
 
 from fastapi import Depends, FastAPI
 from oim_common.auth import build_http_auth_dependency
-from oim_common.fastapi_app import (
+from oim_common.fastapi import (
     add_health_routes,
     add_metadata_routes,
     add_metrics_route,
