@@ -16,7 +16,7 @@ from oim_common.telemetry import configure_tracer
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import JSONResponse, Response
 
-from .auth import require_http_auth
+from oim_common.auth import build_http_auth_dependency
 from .clients.triton_client import TritonClient
 from .errors import InferenceError, InvalidImageError, TritonInferenceError
 from .inference import encode_request_images, format_http_predictions
@@ -26,14 +26,14 @@ from .settings import ServiceSettings
 settings = ServiceSettings()
 configure_logging(settings.effective_log_level)
 logger = logging.getLogger(settings.model_id)
-triton_client: Optional[TritonClient] = None
 rate_limiter = AsyncRateLimiter(settings.rate_limit)
 tracer = configure_tracer(
     enabled=settings.enable_otel,
     service_name=settings.otel_service_name or settings.model_id,
     otel_endpoint=settings.otel_endpoint,
 )
-auth_dependency = Depends(require_http_auth(settings))
+triton_client: Optional[TritonClient] = None
+auth_dependency = Depends(build_http_auth_dependency(settings))
 
 
 async def _lifespan(_app: FastAPI):

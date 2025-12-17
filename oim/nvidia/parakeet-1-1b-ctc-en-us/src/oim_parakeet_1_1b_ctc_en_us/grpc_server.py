@@ -13,7 +13,7 @@ from riva.client.proto import riva_asr_pb2 as rasr
 from riva.client.proto import riva_asr_pb2_grpc as rasr_grpc
 from tritonclient.grpc import model_config_pb2, service_pb2, service_pb2_grpc
 
-from .auth import AuthInterceptor, AuthValidator
+from oim_common.auth import AuthInterceptor, AuthValidator
 from .inference import (
     ASRBackend,
     assign_speakers,

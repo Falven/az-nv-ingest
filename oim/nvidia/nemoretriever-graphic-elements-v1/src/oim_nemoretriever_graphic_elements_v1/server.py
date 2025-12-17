@@ -6,6 +6,7 @@ from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import JSONResponse, Response
+from oim_common.auth import build_http_auth_dependency
 from oim_common.logging import configure_logging
 from oim_common.metrics import (
     metrics_response,
@@ -14,7 +15,6 @@ from oim_common.metrics import (
     track_inflight,
 )
 
-from .auth import require_http_auth
 from .clients.triton_client import TritonClient
 from .errors import InferenceError, InvalidImageError, TritonInferenceError
 from .inference import encode_request_images, format_http_predictions
@@ -25,7 +25,7 @@ settings = ServiceSettings()
 configure_logging(settings.effective_log_level)
 logger = logging.getLogger(settings.model_name)
 triton_client: Optional[TritonClient] = None
-auth_dependency = Depends(require_http_auth(settings))
+auth_dependency = Depends(build_http_auth_dependency(settings))
 
 
 async def _lifespan(_app: FastAPI):

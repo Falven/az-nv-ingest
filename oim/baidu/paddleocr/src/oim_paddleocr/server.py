@@ -3,76 +3,74 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from contextlib import nullcontext
-from typing import TYPE_CHECKING, Optional, Sequence
+from typing import Sequence
 
 import numpy as np
 import tritonclient.http as triton_http
-from oim_common.logging import configure_logging
 from fastapi import Depends, FastAPI, HTTPException
-from fastapi.responses import JSONResponse, Response
-
-if TYPE_CHECKING:  # pragma: no cover
-    from opentelemetry.trace import Tracer
-
-from .auth import require_http_auth
-from .metrics import (
-    BATCH_SIZE,
-    REQUEST_COUNTER,
-    REQUEST_LATENCY,
-    render_metrics,
-    start_metrics_server,
+from oim_common.auth import build_http_auth_dependency
+from oim_common.fastapi_app import (
+    add_health_routes,
+    add_metadata_routes,
+    add_metrics_route,
+    add_root_route,
+    add_triton_routes,
+    configure_service_tracer,
+    install_http_middleware,
+    start_background_metrics,
 )
+from oim_common.logging import configure_logging
+from oim_common.metrics import record_request, track_inflight
+
 from .models import InferRequest
 from .settings import ServiceSettings
-
-try:
-    from opentelemetry import trace
-    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-    from opentelemetry.sdk.resources import Resource
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor
-except Exception:  # pragma: no cover - optional dependency
-    trace = None
-    OTLPSpanExporter = None
-    Resource = None
-    TracerProvider = None
-    BatchSpanProcessor = None
 
 logger = logging.getLogger("paddleocr-nim")
 
 
-def _configure_tracer(settings: ServiceSettings) -> Optional["Tracer"]:
-    endpoint = settings.otel_endpoint or os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
-    if not settings.enable_otel and not endpoint:
-        return None
-    if (
-        trace is None
-        or OTLPSpanExporter is None
-        or TracerProvider is None
-        or BatchSpanProcessor is None
-    ):
-        logger.warning(
-            "OpenTelemetry requested but not available; skipping OTEL setup."
-        )
-        return None
-    resource = Resource.create({"service.name": settings.otel_service_name})
-    provider = TracerProvider(resource=resource)
-    processor = BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint))
-    provider.add_span_processor(processor)
-    trace.set_tracer_provider(provider)
-    return trace.get_tracer(settings.otel_service_name)
-
-
 settings = ServiceSettings()
 configure_logging(settings.log_level)
-tracer = _configure_tracer(settings)
+tracer = configure_service_tracer(
+    enabled=settings.enable_otel,
+    model_id=settings.model_id,
+    model_version=settings.model_version,
+    otel_endpoint=settings.otel_endpoint,
+)
 TRITON_HTTP_URL = os.getenv("TRITON_HTTP_URL", "http://127.0.0.1:8500")
 triton_client = triton_http.InferenceServerClient(url=TRITON_HTTP_URL, verbose=False)
+auth_dependency = Depends(build_http_auth_dependency(settings))
+
+
+class _TritonClientProxy:
+    def is_live(self) -> bool:
+        try:
+            return bool(triton_client.is_server_live())
+        except Exception:
+            return False
+
+    def is_ready(self) -> bool:
+        try:
+            return bool(
+                triton_client.is_server_ready()
+                and triton_client.is_model_ready(settings.model_name)
+            )
+        except Exception:
+            return False
+
+    def repository_index(self):
+        return triton_client.get_model_repository_index()
+
+    def model_metadata(self):
+        return triton_client.get_model_metadata(settings.model_name)
+
+    def model_config(self):
+        return triton_client.get_model_config(settings.model_name)
 
 
 async def _lifespan(app: FastAPI):
-    start_metrics_server(settings)
+    start_background_metrics(settings)
     yield
 
 
@@ -80,56 +78,26 @@ app = FastAPI(
     title=settings.model_id, version=settings.model_version, lifespan=_lifespan
 )
 
-
-@app.get("/v1/health/live")
-async def live() -> JSONResponse:
-    return JSONResponse({"status": "live"}, status_code=200)
-
-
-@app.get("/v1/health/ready")
-async def ready() -> JSONResponse:
-    try:
-        server_ready = triton_client.is_server_ready()
-        model_ready = triton_client.is_model_ready(settings.model_name)
-    except Exception as exc:
-        logger.exception("Triton readiness check failed: %s", exc)
-        return JSONResponse({"status": "unavailable"}, status_code=503)
-    is_ready = server_ready and model_ready
-    return JSONResponse(
-        {"status": "ready" if is_ready else "unavailable"},
-        status_code=200 if is_ready else 503,
-    )
+install_http_middleware(app, tracer)
+add_health_routes(app, ready_check=_TritonClientProxy().is_ready)
+add_metadata_routes(
+    app,
+    model_id=settings.model_id,
+    model_version=settings.model_version,
+    auth_dependency=[auth_dependency],
+    max_batch_size=settings.max_batch_size,
+)
+add_triton_routes(
+    app,
+    triton_model_name=settings.model_name,
+    client=_TritonClientProxy(),
+    auth_dependency=[auth_dependency],
+)
+add_metrics_route(app, auth_dependency=[auth_dependency])
+add_root_route(app, message=settings.model_id)
 
 
-@app.get("/v1/metadata", dependencies=[Depends(require_http_auth)])
-async def metadata() -> JSONResponse:
-    try:
-        meta = triton_client.get_model_metadata(settings.model_name)
-        max_batch = meta.get("max_batch_size", settings.max_batch_size)
-    except Exception:
-        max_batch = settings.max_batch_size
-    model_info = {
-        "id": settings.model_id,
-        "name": settings.model_id,
-        "version": settings.model_version,
-        "shortName": settings.short_name,
-        "maxBatchSize": max_batch,
-    }
-    return JSONResponse({"modelInfo": [model_info]}, status_code=200)
-
-
-@app.get("/")
-async def root() -> JSONResponse:
-    return JSONResponse({"message": settings.model_id}, status_code=200)
-
-
-@app.get("/metrics", dependencies=[Depends(require_http_auth)])
-@app.get("/v2/metrics", dependencies=[Depends(require_http_auth)])
-async def metrics() -> Response:
-    return render_metrics()
-
-
-@app.post("/v1/infer", dependencies=[Depends(require_http_auth)])
+@app.post("/v1/infer", dependencies=[auth_dependency])
 async def infer_http(request: InferRequest) -> dict:
     if len(request.input) == 0:
         raise HTTPException(
@@ -154,93 +122,36 @@ async def infer_http(request: InferRequest) -> dict:
     triton_input.set_data_from_numpy(payload)
     triton_output = triton_http.InferRequestedOutput("OUTPUT")
 
-    REQUEST_COUNTER.labels("http").inc()
+    started = time.perf_counter()
+    status_label = "200"
     try:
-        with tracer.start_as_current_span("http_infer") if tracer else nullcontext():
-            result = triton_client.infer(
-                model_name=settings.model_name,
-                inputs=[triton_input],
-                outputs=[triton_output],
-            )
+        with track_inflight("http", "/v1/infer"):
+            with (
+                tracer.start_as_current_span("http_infer") if tracer else nullcontext()
+            ):
+                result = triton_client.infer(
+                    model_name=settings.model_name,
+                    inputs=[triton_input],
+                    outputs=[triton_output],
+                )
     except Exception as exc:
+        status_label = "500"
         logger.exception("Triton inference failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
 
     outputs = result.as_numpy("OUTPUT")
     if outputs is None:
         outputs = []
-    BATCH_SIZE.labels("http").observe(float(len(urls)))
-    REQUEST_LATENCY.labels("http").observe(0.0)
     try:
         parsed = [json.loads(item.decode("utf-8")) for item in outputs]
     except Exception as exc:
+        status_label = "502"
         logger.exception("Failed to parse Triton output: %s", exc)
         raise HTTPException(
             status_code=500, detail="Failed to parse inference output"
         ) from exc
+    record_request("http", "/v1/infer", status_label, started)
     return {"data": parsed}
-
-
-@app.get("/v2/health/live")
-async def triton_live() -> dict:
-    return {"live": True}
-
-
-@app.get("/v2/health/ready")
-async def triton_ready() -> dict:
-    try:
-        return {"ready": triton_client.is_model_ready(settings.model_name)}
-    except Exception:
-        return {"ready": False}
-
-
-@app.get("/v2/models", dependencies=[Depends(require_http_auth)])
-async def list_models() -> dict:
-    try:
-        ready = triton_client.is_model_ready(settings.model_name)
-    except Exception:
-        ready = False
-    state = "READY" if ready else "UNAVAILABLE"
-    return {
-        "models": [
-            {
-                "name": settings.model_name,
-                "version": settings.model_version,
-                "state": state,
-            }
-        ]
-    }
-
-
-@app.get("/v2/models/{model_name}", dependencies=[Depends(require_http_auth)])
-async def model_metadata_http(model_name: str) -> dict:
-    if model_name != settings.model_name:
-        raise HTTPException(status_code=404, detail=f"Unknown model {model_name}")
-    try:
-        return triton_client.get_model_metadata(model_name)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-
-@app.get("/v2/models/{model_name}/config", dependencies=[Depends(require_http_auth)])
-async def model_config_http(model_name: str) -> dict:
-    if model_name != settings.model_name:
-        raise HTTPException(status_code=404, detail=f"Unknown model {model_name}")
-    try:
-        return triton_client.get_model_config(model_name)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-
-@app.get("/v2/models/{model_name}/ready")
-async def model_ready_http(model_name: str) -> dict:
-    try:
-        is_ready = model_name == settings.model_name and triton_client.is_model_ready(
-            model_name
-        )
-    except Exception:
-        is_ready = False
-    return {"ready": is_ready}
 
 
 if __name__ == "__main__":

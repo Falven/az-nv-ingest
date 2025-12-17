@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import Awaitable, Callable
 
 import grpc
-from oim_common.auth import extract_token_with_fallback
 from fastapi import HTTPException, Request, status
+from oim_common.auth import extract_token_with_fallback
 
 from .settings import ServiceSettings
 

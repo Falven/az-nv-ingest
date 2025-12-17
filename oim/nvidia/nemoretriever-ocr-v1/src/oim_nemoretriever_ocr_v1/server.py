@@ -7,6 +7,9 @@ from typing import AsyncIterator, Awaitable, Callable, ContextManager
 
 import numpy as np
 import tritonclient.grpc as grpcclient
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, Response
+from oim_common.auth import build_http_auth_dependency
 from oim_common.logging import configure_logging
 from oim_common.metrics import (
     metrics_response,
@@ -14,11 +17,8 @@ from oim_common.metrics import (
     start_metrics_server,
 )
 from oim_common.telemetry import configure_tracer
-from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, Response
 from opentelemetry.trace import Status, StatusCode
 
-from .auth import require_http_auth
 from .inference import parsed_from_triton_output
 from .models import InferRequest, InferResponse, InferResponseItem
 from .settings import ServiceSettings
@@ -34,7 +34,7 @@ tracer = configure_tracer(
 triton_client = grpcclient.InferenceServerClient(
     url=settings.triton_grpc_url, verbose=False
 )
-auth_dependency = Depends(require_http_auth(settings))
+auth_dependency = Depends(build_http_auth_dependency(settings))
 
 
 def _maybe_start_span(name: str) -> ContextManager[object]:

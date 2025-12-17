@@ -6,10 +6,9 @@ import time
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from oim_common.logging import configure_logging
 from fastapi import FastAPI
-
-from .auth import AuthValidator, build_http_auth_dependency
+from oim_common.auth import AuthValidator, build_http_auth_dependency
+from oim_common.logging import configure_logging
 from .grpc_server import RequestLimiter, create_grpc_server
 from .http_api import create_router
 from .inference import create_asr_backend
@@ -70,9 +69,10 @@ metrics = RequestMetrics(namespace=settings.metrics_namespace)
 auth_validator = AuthValidator(settings)
 public_health_paths = {"/", "/v1/health/live", "/v1/health/ready"}
 auth_dependency = build_http_auth_dependency(
-    auth_validator,
-    allow_unauthenticated_health=settings.allow_unauth_health,
-    public_paths=public_health_paths,
+    settings,
+    allow_unauthenticated_paths=public_health_paths
+    if settings.allow_unauth_health
+    else None,
 )
 
 

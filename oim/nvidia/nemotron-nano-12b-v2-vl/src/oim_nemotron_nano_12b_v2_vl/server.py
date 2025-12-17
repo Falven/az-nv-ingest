@@ -6,6 +6,9 @@ import time
 from contextlib import asynccontextmanager, nullcontext
 from typing import Any, Mapping
 
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, Response, StreamingResponse
+from oim_common.auth import build_http_auth_dependency
 from oim_common.logging import configure_logging
 from oim_common.metrics import (
     metrics_response,
@@ -15,11 +18,8 @@ from oim_common.metrics import (
 )
 from oim_common.rate_limit import AsyncRateLimiter
 from oim_common.telemetry import configure_tracer
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import ValidationError
 
-from .auth import require_http_auth
 from .clients.triton_client import TritonCaptionClient
 from .inference import (
     generate_caption,
@@ -38,7 +38,7 @@ tracer = configure_tracer(
     otel_endpoint=settings.otel_endpoint,
 )
 rate_limiter = AsyncRateLimiter(settings.rate_limit)
-auth_dependency = require_http_auth(settings)
+auth_dependency = build_http_auth_dependency(settings)
 triton_client: TritonCaptionClient | None = None
 startup_error: str | None = None
 

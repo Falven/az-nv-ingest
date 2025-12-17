@@ -38,3 +38,19 @@ class ServiceSettings(CommonSettings):
 
     def allowed_tokens(self) -> Set[str]:
         return self.resolved_auth_tokens()
+
+    @property
+    def auth_tokens(self) -> Set[str]:
+        """
+        Resolve configured bearer tokens.
+        """
+
+        return self.resolved_auth_tokens()
+
+    @property
+    def auth_required(self) -> bool:
+        """
+        Determine whether auth should be enforced for requests.
+        """
+
+        return self.require_auth or bool(self.auth_tokens)
