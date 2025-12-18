@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from typing import Any, Dict
 
 from fastapi import Depends, FastAPI
@@ -15,7 +14,7 @@ from oim_common.fastapi import (
     install_http_middleware,
     start_background_metrics,
 )
-from oim_common.logging import configure_logging
+from oim_common.logging import configure_logging, get_logger
 from oim_common.rate_limit import AsyncRateLimiter
 
 from .inference import TritonEmbeddingClient
@@ -24,7 +23,7 @@ from .settings import ServiceSettings
 
 settings = ServiceSettings()
 configure_logging(settings.log_level if not settings.log_verbose else "DEBUG")
-logger = logging.getLogger("llama-3.2-nv-embedqa-1b-v2")
+logger = get_logger("llama-3.2-nv-embedqa-1b-v2")
 tracer = configure_service_tracer(
     enabled=settings.enable_otel,
     model_id=settings.model_id,

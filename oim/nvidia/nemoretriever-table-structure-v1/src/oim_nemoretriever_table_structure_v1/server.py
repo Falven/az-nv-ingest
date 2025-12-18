@@ -2,19 +2,22 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Optional
+from typing import AsyncIterator
 
-from oim_common.logging import configure_logging
-from oim_common.metrics import (
-    metrics_response,
-    record_request,
-    start_metrics_server,
-    track_inflight,
-)
 from fastapi import Depends, FastAPI, HTTPException
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse
+from oim_common.auth import build_http_auth_dependency
+from oim_common.fastapi import (
+    add_health_routes,
+    add_metadata_routes,
+    add_metrics_route,
+    add_root_route,
+    add_triton_routes,
+    start_background_metrics,
+)
+from oim_common.logging import configure_logging
+from oim_common.metrics import record_request, track_inflight
 
-from .auth import require_http_auth
 from .clients.triton_client import TritonClient
 from .errors import InvalidImageError, InferenceError, TritonInferenceError
 from .inference import encode_request_images, format_http_predictions
@@ -24,14 +27,14 @@ from .settings import ServiceSettings
 settings = ServiceSettings()
 configure_logging(settings.effective_log_level)
 logger = logging.getLogger(settings.model_name)
-triton_client: Optional[TritonClient] = None
-auth_dependency = Depends(require_http_auth(settings))
+triton_client: TritonClient | None = None
+auth_dependency = Depends(build_http_auth_dependency(settings))
 
 
-async def _lifespan(_app: FastAPI):
+async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Manage startup and shutdown tasks for the FastAPI app."""
     global triton_client
-    start_metrics_server(settings.metrics_port, settings.auth_required)
+    start_background_metrics(settings)
     triton_client = TritonClient(settings)
     await triton_client.wait_for_model_ready()
     yield
@@ -52,105 +55,65 @@ def _ensure_client() -> TritonClient:
     return triton_client
 
 
-@app.get("/v1/health/live")
-async def live() -> JSONResponse:
-    """Liveness probe for container orchestration."""
-    return JSONResponse({"live": True}, status_code=200)
-
-
-@app.get("/v1/health/ready")
-async def ready() -> JSONResponse:
+def _ready_check() -> bool:
     """Readiness probe indicating model availability."""
     client = triton_client
-    is_ready = bool(client and client.is_model_ready())
-    return JSONResponse({"ready": is_ready}, status_code=200)
+    return bool(client and client.is_ready())
 
 
-@app.get("/v2/health/live")
-async def triton_live() -> JSONResponse:
-    """Triton-compatible liveness probe."""
-    client = triton_client
-    is_live = bool(client and client.is_server_ready())
-    return JSONResponse({"live": is_live}, status_code=200)
+class _TritonRouteClient:
+    """Adapter used by shared Triton FastAPI routes."""
+
+    def is_live(self) -> bool:
+        client = triton_client
+        return bool(client and client.is_live())
+
+    def is_ready(self) -> bool:
+        client = triton_client
+        return bool(client and client.is_ready())
+
+    def repository_index(self) -> list[dict[str, object]]:
+        client = triton_client
+        return [] if client is None else client.repository_index()
+
+    def model_metadata(self) -> dict[str, object]:
+        client = _ensure_client()
+        try:
+            return client.model_metadata()
+        except TritonInferenceError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    def model_config(self) -> dict[str, object]:
+        client = _ensure_client()
+        try:
+            return client.model_config()
+        except TritonInferenceError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
-@app.get("/v2/health/ready")
-async def triton_ready() -> JSONResponse:
-    """Triton-compatible readiness probe."""
-    client = triton_client
-    is_ready = bool(client and client.is_model_ready())
-    return JSONResponse({"ready": is_ready}, status_code=200)
-
-
-@app.get("/v1/models", dependencies=[auth_dependency])
-async def list_models() -> JSONResponse:
-    """List available models for compatibility with upstream clients."""
-    return JSONResponse(
-        {"object": "list", "data": [{"id": settings.model_name}]}, status_code=200
-    )
-
-
-@app.get("/v1/metadata", dependencies=[auth_dependency])
-async def metadata() -> JSONResponse:
-    """Expose model metadata for discovery."""
-    short_name = f"{settings.model_name}:{settings.model_version}"
-    payload = {
-        "id": settings.model_name,
-        "name": settings.model_name,
-        "version": settings.model_version,
-        "modelInfo": [
-            {
-                "name": settings.model_name,
-                "version": settings.model_version,
-                "shortName": short_name,
-                "maxBatchSize": settings.max_batch_size,
-            }
-        ],
-    }
-    return JSONResponse(payload, status_code=200)
-
-
-@app.get("/metrics", dependencies=[auth_dependency])
-@app.get("/v2/metrics", dependencies=[auth_dependency])
-async def metrics() -> Response:
-    """Render Prometheus metrics."""
-    return metrics_response()
-
-
-@app.get("/v2/models/{model_name}", dependencies=[auth_dependency])
-async def model_metadata_http(model_name: str) -> JSONResponse:
-    """Expose Triton model metadata over HTTP."""
-    if model_name != settings.triton_model_name:
-        raise HTTPException(status_code=404, detail="Unknown model")
-    client = _ensure_client()
-    try:
-        payload = client.model_metadata()
-    except TritonInferenceError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-    return JSONResponse(payload)
-
-
-@app.get("/v2/models/{model_name}/config", dependencies=[auth_dependency])
-async def model_config_http(model_name: str) -> JSONResponse:
-    """Expose Triton model configuration over HTTP."""
-    if model_name != settings.triton_model_name:
-        raise HTTPException(status_code=404, detail="Unknown model")
-    client = _ensure_client()
-    try:
-        payload = client.model_config()
-    except TritonInferenceError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-    return JSONResponse(payload)
-
-
-@app.get("/v2/models/{model_name}/ready")
-async def model_ready_http(model_name: str) -> JSONResponse:
-    """Report model readiness for Triton parity endpoints."""
-    if model_name != settings.triton_model_name:
-        raise HTTPException(status_code=404, detail="Unknown model")
-    client = triton_client
-    is_ready = bool(client and client.is_model_ready())
-    return JSONResponse({"ready": is_ready})
+add_health_routes(app, ready_check=_ready_check)
+add_metadata_routes(
+    app,
+    model_id=settings.model_name,
+    model_version=settings.model_version,
+    auth_dependency=[auth_dependency],
+    max_batch_size=settings.max_batch_size,
+)
+add_metrics_route(
+    app,
+    auth_dependency=[auth_dependency],
+    include_triton_route=True,
+)
+add_triton_routes(
+    app,
+    triton_model_name=settings.triton_model_name,
+    client=_TritonRouteClient(),
+    include_repository_index=False,
+    health_dependency=[],
+    metadata_dependency=[auth_dependency],
+    model_ready_dependency=[],
+)
+add_root_route(app, message=f"{settings.model_name} HTTP")
 
 
 @app.post("/v1/infer", dependencies=[auth_dependency])
@@ -196,8 +159,3 @@ async def infer(request_body: InferRequest) -> JSONResponse:
     ]
     record_request("http", endpoint, "success", start_time)
     return JSONResponse({"data": response_items}, status_code=200)
-
-
-@app.get("/")
-async def root() -> JSONResponse:
-    return JSONResponse({"message": f"{settings.model_name} HTTP"}, status_code=200)

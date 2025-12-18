@@ -1,10 +1,17 @@
 from __future__ import annotations
 
-import logging
 from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
 from fastapi import HTTPException, status
+from oim_common.logging import get_logger
+from oim_common.triton import (
+    TritonHttpClient,
+    parse_max_batch_size,
+    resolve_max_batch_size,
+    validate_batch_size,
+    validate_requested_model,
+)
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -24,34 +31,13 @@ from .models import (
 )
 from .settings import ServiceSettings
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 TRUNCATION_CODES: Dict[TruncationMode, int] = {
     "NONE": 0,
     "END": 1,
     "START": 2,
 }
-
-
-def _parse_max_batch_size(config: Dict[str, Any]) -> Optional[int]:
-    """
-    Read the Triton max_batch_size from the model config payload.
-    """
-    max_batch = config.get("max_batch_size")
-    return int(max_batch) if isinstance(max_batch, int) and max_batch > 0 else None
-
-
-def _resolve_batch_limit(
-    config_limit: Optional[int], settings_limit: Optional[int]
-) -> Optional[int]:
-    """
-    Combine Triton config and settings batch size limits.
-    """
-    if config_limit is not None and settings_limit is not None:
-        return min(config_limit, settings_limit)
-    if config_limit is not None:
-        return config_limit
-    return settings_limit
 
 
 class TritonRerankClient:
@@ -61,17 +47,18 @@ class TritonRerankClient:
 
     def __init__(self, settings: ServiceSettings):
         self._settings = settings
-        self._client = triton_http.InferenceServerClient(
-            url=settings.triton_http_endpoint,
+        self._triton_client = TritonHttpClient(
+            endpoint=settings.triton_http_endpoint,
+            model_name=settings.triton_model_name,
+            timeout=settings.triton_timeout,
             verbose=bool(settings.log_verbose),
-            connection_timeout=settings.triton_timeout,
-            network_timeout=settings.triton_timeout,
         )
-        self._model_name = settings.triton_model_name
-        metadata = self._client.get_model_metadata(model_name=self._model_name)
-        config = self._client.get_model_config(model_name=self._model_name)
-        self._max_batch_size = _resolve_batch_limit(
-            _parse_max_batch_size(config), settings.max_batch_size
+        self._client = self._triton_client.client
+        self._model_name = self._triton_client.model_name
+        metadata = self._triton_client.model_metadata()
+        config = self._triton_client.model_config()
+        self._max_batch_size = resolve_max_batch_size(
+            parse_max_batch_size(config), settings.max_batch_size
         )
         logger.info(
             "Loaded Triton model %s (versions=%s, max_batch=%s)",
@@ -91,47 +78,38 @@ class TritonRerankClient:
         """
         Report readiness from the Triton server and model.
         """
-        try:
-            return bool(
-                self._client.is_server_ready()
-                and self._client.is_model_ready(model_name=self._model_name)
-            )
-        except Exception:
-            return False
+        return self._triton_client.is_ready()
 
     def is_live(self) -> bool:
         """
         Report liveness from the Triton server.
         """
-        try:
-            return bool(self._client.is_server_live())
-        except Exception:
-            return False
+        return self._triton_client.is_live()
 
     def model_metadata(self) -> Dict[str, Any]:
         """
         Fetch model metadata for Triton v2 endpoints.
         """
-        return self._client.get_model_metadata(model_name=self._model_name)
+        return self._triton_client.model_metadata()
 
     def model_config(self) -> Dict[str, Any]:
         """
         Fetch model config for Triton v2 endpoints.
         """
-        return self._client.get_model_config(model_name=self._model_name)
+        return self._triton_client.model_config()
 
     def repository_index(self) -> List[Dict[str, Any]]:
         """
         Return the model repository index.
         """
-        return self._client.get_model_repository_index()
+        return list(self._triton_client.repository_index())
 
     def rerank(self, request_body: RankingRequest) -> Dict[str, Any]:
         """
         Execute reranking via Triton and format the response payload.
         """
-        self._validate_model_name(request_body.model)
-        self._validate_batch_size(len(request_body.passages))
+        validate_requested_model(request_body.model, self._settings.model_id)
+        validate_batch_size(len(request_body.passages), self._max_batch_size)
         passages = [passage.text for passage in request_body.passages]
         try:
             scores = self._infer(
@@ -152,24 +130,6 @@ class TritonRerankClient:
             )
         rankings = self._format_rankings(scores)
         return {"rankings": rankings}
-
-    def _validate_model_name(self, model_name: Optional[str]) -> None:
-        if model_name is None:
-            return
-        if model_name != self._settings.model_id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unsupported model '{model_name}', expected '{self._settings.model_id}'",
-            )
-
-    def _validate_batch_size(self, item_count: int) -> None:
-        if self._max_batch_size is None:
-            return
-        if item_count > self._max_batch_size:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Batch size {item_count} exceeds limit {self._max_batch_size}",
-            )
 
     @retry(
         retry=retry_if_exception_type(InferenceServerException),

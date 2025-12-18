@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import json
 from typing import List
 
-import numpy as np
 import triton_python_backend_utils as pb_utils  # type: ignore[reportMissingImports]
-from oim_paddleocr.inference import format_result, load_image
+from oim_paddleocr.inference import build_grpc_output, denormalize_chw, format_result
 from oim_paddleocr.settings import ServiceSettings
 
 try:
@@ -37,37 +35,51 @@ class TritonPythonModel:
     ) -> List[pb_utils.InferenceResponse]:
         responses: List[pb_utils.InferenceResponse] = []
         for request in requests:
-            input_tensor = pb_utils.get_input_tensor_by_name(request, "INPUT")
+            input_tensor = pb_utils.get_input_tensor_by_name(request, "input")
             if input_tensor is None:
-                responses.append(self._error_response("INPUT tensor missing"))
+                responses.append(self._error_response("input tensor missing"))
                 continue
 
             try:
-                payloads = input_tensor.as_numpy().tolist()
+                payloads = input_tensor.as_numpy()
             except Exception as exc:
                 responses.append(
-                    self._error_response(f"Failed to read INPUT tensor: {exc}")
+                    self._error_response(f"Failed to read input tensor: {exc}")
                 )
                 continue
 
-            outputs: List[bytes] = []
+            if payloads.ndim != 4 or payloads.shape[1] != 3:
+                responses.append(
+                    self._error_response(
+                        "input tensor must have shape (batch, 3, height, width)"
+                    )
+                )
+                continue
+
+            results = []
             failed = False
             for raw in payloads:
                 try:
-                    url = (
-                        raw.decode("utf-8")
-                        if isinstance(raw, (bytes, bytearray))
-                        else str(raw)
+                    image = denormalize_chw(raw)
+                except Exception as exc:
+                    responses.append(
+                        self._error_response(f"Failed to decode input: {exc}")
                     )
-                    image = load_image(url, self.settings.request_timeout_seconds)
+                    failed = True
+                    break
+
+                try:
                     result = self.ocr.predict(
                         [image],
                         use_layout_detection=self.settings.use_layout_detection,
                         use_chart_recognition=self.settings.use_chart_recognition,
                         format_block_content=self.settings.format_block_content,
                     )[0]
-                    formatted = format_result(result)
-                    outputs.append(json.dumps(formatted.model_dump()).encode("utf-8"))
+                    results.append(
+                        format_result(
+                            result, image_size=(image.shape[1], image.shape[0])
+                        )
+                    )
                 except Exception as exc:
                     responses.append(self._error_response(f"Inference failed: {exc}"))
                     failed = True
@@ -76,6 +88,7 @@ class TritonPythonModel:
             if failed:
                 continue
 
-            out_tensor = pb_utils.Tensor("OUTPUT", np.array(outputs, dtype=np.object_))
+            grpc_output = build_grpc_output(results)
+            out_tensor = pb_utils.Tensor("output", grpc_output)
             responses.append(pb_utils.InferenceResponse(output_tensors=[out_tensor]))
         return responses

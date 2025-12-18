@@ -1,15 +1,10 @@
 from __future__ import annotations
 
-import json
 import logging
-import os
 import time
 from contextlib import nullcontext
-from typing import Sequence
 
-import numpy as np
-import tritonclient.http as triton_http
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException
 from oim_common.auth import build_http_auth_dependency
 from oim_common.fastapi import (
     add_health_routes,
@@ -23,7 +18,10 @@ from oim_common.fastapi import (
 )
 from oim_common.logging import configure_logging
 from oim_common.metrics import record_request, track_inflight
+from oim_common.triton import TritonHttpClient
 
+from .inference import infer as run_inference
+from .inference import init_inference, load_image, model_ready
 from .models import InferRequest
 from .settings import ServiceSettings
 
@@ -38,35 +36,14 @@ tracer = configure_service_tracer(
     model_version=settings.model_version,
     otel_endpoint=settings.otel_endpoint,
 )
-TRITON_HTTP_URL = os.getenv("TRITON_HTTP_URL", "http://127.0.0.1:8500")
-triton_client = triton_http.InferenceServerClient(url=TRITON_HTTP_URL, verbose=False)
-auth_dependency = Depends(build_http_auth_dependency(settings))
-
-
-class _TritonClientProxy:
-    def is_live(self) -> bool:
-        try:
-            return bool(triton_client.is_server_live())
-        except Exception:
-            return False
-
-    def is_ready(self) -> bool:
-        try:
-            return bool(
-                triton_client.is_server_ready()
-                and triton_client.is_model_ready(settings.model_name)
-            )
-        except Exception:
-            return False
-
-    def repository_index(self):
-        return triton_client.get_model_repository_index()
-
-    def model_metadata(self):
-        return triton_client.get_model_metadata(settings.model_name)
-
-    def model_config(self):
-        return triton_client.get_model_config(settings.model_name)
+init_inference(settings)
+triton_health = TritonHttpClient(
+    endpoint=settings.triton_http_url,
+    model_name=settings.model_name,
+    timeout=settings.request_timeout_seconds,
+    verbose=bool(settings.triton_log_verbose),
+)
+auth_dependency = build_http_auth_dependency(settings)
 
 
 async def _lifespan(app: FastAPI):
@@ -79,18 +56,23 @@ app = FastAPI(
 )
 
 install_http_middleware(app, tracer)
-add_health_routes(app, ready_check=_TritonClientProxy().is_ready)
+add_health_routes(
+    app,
+    ready_check=lambda: triton_health.is_ready() and model_ready(),
+    response_style="status",
+)
 add_metadata_routes(
     app,
     model_id=settings.model_id,
     model_version=settings.model_version,
+    short_name=settings.short_name,
     auth_dependency=[auth_dependency],
     max_batch_size=settings.max_batch_size,
 )
 add_triton_routes(
     app,
     triton_model_name=settings.model_name,
-    client=_TritonClientProxy(),
+    client=triton_health,
     auth_dependency=[auth_dependency],
 )
 add_metrics_route(app, auth_dependency=[auth_dependency])
@@ -109,18 +91,21 @@ async def infer_http(request: InferRequest) -> dict:
             detail=f"Batch size {len(request.input)} exceeds limit {settings.max_batch_size}.",
         )
     try:
-        ready = triton_client.is_model_ready(settings.model_name)
+        triton_ready = triton_health.is_ready()
     except Exception as exc:
         logger.exception("Triton model readiness check failed: %s", exc)
         raise HTTPException(status_code=503, detail="Model is not loaded") from exc
-    if not ready:
+    if not triton_ready or not model_ready():
         raise HTTPException(status_code=503, detail="Model is not loaded")
 
-    urls: Sequence[str] = [item.url for item in request.input]
-    triton_input = triton_http.InferInput("INPUT", [len(urls)], "BYTES")
-    payload = np.array(urls, dtype=object)
-    triton_input.set_data_from_numpy(payload)
-    triton_output = triton_http.InferRequestedOutput("OUTPUT")
+    images = []
+    for item in request.input:
+        try:
+            images.append(load_image(item.url, settings.request_timeout_seconds))
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     started = time.perf_counter()
     status_label = "200"
@@ -129,27 +114,13 @@ async def infer_http(request: InferRequest) -> dict:
             with (
                 tracer.start_as_current_span("http_infer") if tracer else nullcontext()
             ):
-                result = triton_client.infer(
-                    model_name=settings.model_name,
-                    inputs=[triton_input],
-                    outputs=[triton_output],
-                )
+                result = run_inference(images, settings)
     except Exception as exc:
         status_label = "500"
         logger.exception("Triton inference failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
 
-    outputs = result.as_numpy("OUTPUT")
-    if outputs is None:
-        outputs = []
-    try:
-        parsed = [json.loads(item.decode("utf-8")) for item in outputs]
-    except Exception as exc:
-        status_label = "502"
-        logger.exception("Failed to parse Triton output: %s", exc)
-        raise HTTPException(
-            status_code=500, detail="Failed to parse inference output"
-        ) from exc
+    parsed = [item.model_dump() for item in result]
     record_request("http", "/v1/infer", status_label, started)
     return {"data": parsed}
 

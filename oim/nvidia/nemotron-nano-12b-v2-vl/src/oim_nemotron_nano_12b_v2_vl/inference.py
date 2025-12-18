@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import io
 import json
 import logging
 from typing import AsyncIterator
 
 from fastapi import HTTPException, status
-from PIL import Image
+from oim_common.errors import InvalidImageError
+from oim_common.images import ensure_png_bytes
+from oim_common.triton import validate_batch_size, validate_requested_model
 
 from .clients.triton_client import TritonCaptionClient, TritonCaptionRequest
 from .models import (
@@ -55,15 +56,11 @@ def _decode_image_url(data_url: str) -> bytes:
             detail="invalid base64 image content",
         ) from exc
     try:
-        with Image.open(io.BytesIO(binary)) as image:
-            normalized = image.convert("RGB")
-            buffer = io.BytesIO()
-            normalized.save(buffer, format="PNG")
-            return buffer.getvalue()
-    except Exception as exc:
+        return ensure_png_bytes(binary)
+    except InvalidImageError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="unable to decode image",
+            detail=str(exc),
         ) from exc
 
 
@@ -107,11 +104,7 @@ def _coerce_prompts(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="exactly one image is required",
         )
-    if image_count > settings.max_batch_size:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="too many images provided",
-        )
+    validate_batch_size(image_count, settings.max_batch_size)
     if not user_prompt_parts:
         user_prompt_parts.append(settings.user_prompt or DEFAULT_USER_PROMPT)
 
@@ -123,11 +116,7 @@ def prepare_request(payload: ChatRequest, settings: ServiceSettings) -> ParsedRe
     """
     Normalize a chat request into an inference-ready payload.
     """
-    if payload.model and payload.model != settings.served_model_name:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="requested model is not available",
-        )
+    validate_requested_model(payload.model, settings.served_model_name)
     system_prompt, user_prompt, image_bytes = _coerce_prompts(
         payload.messages, settings
     )

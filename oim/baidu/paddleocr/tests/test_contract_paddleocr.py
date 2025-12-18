@@ -20,6 +20,19 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 STUB_PATH = PROJECT_ROOT / "tests" / "stubs"
 MODEL_ID = "baidu/paddleocr"
 
+sys.path.insert(0, str(STUB_PATH))
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+sys.path.insert(0, str(PROJECT_ROOT.parent / "common" / "src"))
+
+from oim_paddleocr.inference import build_grpc_output  # noqa: E402
+from oim_paddleocr.models import (  # noqa: E402
+    BoundingBox,
+    InferResponseItem,
+    Point,
+    TextDetection,
+    TextPrediction,
+)
+
 
 def find_free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -185,3 +198,30 @@ def test_infer_contract(service: Dict[str, Any]) -> None:
         prediction = detection["text_prediction"]
         assert isinstance(prediction.get("text"), str)
         assert isinstance(prediction.get("confidence"), (float, int))
+
+
+def test_build_grpc_output_format() -> None:
+    detections = [
+        TextDetection(
+            bounding_box=BoundingBox(
+                points=[
+                    Point(x=0.0, y=0.0),
+                    Point(x=1.0, y=0.0),
+                    Point(x=1.0, y=1.0),
+                    Point(x=0.0, y=1.0),
+                ]
+            ),
+            text_prediction=TextPrediction(text="hello", confidence=0.5),
+        )
+    ]
+    item = InferResponseItem(text_detections=detections)
+    output = build_grpc_output([item, item])
+    assert output.shape == (3, 2)
+    decoded_boxes = json.loads(output[0, 0].decode("utf-8"))
+    assert isinstance(decoded_boxes, list)
+    assert decoded_boxes[0][0] == [0.0, 0.0]
+    assert decoded_boxes[0][-1] == [0.0, 1.0]
+    decoded_texts = json.loads(output[1, 1].decode("utf-8"))
+    assert decoded_texts[0] == "hello"
+    decoded_confs = json.loads(output[2, 1].decode("utf-8"))
+    assert decoded_confs[0] == pytest.approx(0.5)

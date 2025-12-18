@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from oim_common.settings import CommonSettings
+from oim_common.settings import HttpServerSettings
 from pydantic import Field
 from pydantic_settings import SettingsConfigDict
 
@@ -11,7 +11,7 @@ DEFAULT_SYSTEM_PROMPT = "/no_think"
 DEFAULT_USER_PROMPT = "Caption the content of this image:"
 
 
-class ServiceSettings(CommonSettings):
+class ServiceSettings(HttpServerSettings):
     """
     Runtime configuration for the Nemotron Nano VLM NIM.
     """
@@ -25,8 +25,6 @@ class ServiceSettings(CommonSettings):
         "nvidia/nemotron-nano-12b-v2-vl", alias="SERVED_MODEL_NAME"
     )
     model_version: str = Field("1.0.0", alias="MODEL_VERSION")
-    http_port: int = Field(8000, alias="NIM_HTTP_API_PORT")
-    metrics_port: int | None = Field(8002, alias="NIM_METRICS_PORT")
     triton_http_port: int = Field(8003, alias="NIM_TRITON_HTTP_PORT")
     triton_grpc_port: int = Field(8004, alias="NIM_TRITON_GRPC_PORT")
     triton_metrics_port: int = Field(8005, alias="NIM_TRITON_METRICS_PORT")
@@ -38,17 +36,12 @@ class ServiceSettings(CommonSettings):
     )
     triton_model_name: str = Field("nemotron_nano_12b_v2_vl", alias="TRITON_MODEL_NAME")
     triton_timeout: float = Field(120.0, alias="TRITON_TIMEOUT_SECONDS")
-    log_verbose: int = Field(0, alias="NIM_TRITON_LOG_VERBOSE")
-    rate_limit: int | None = Field(None, alias="NIM_TRITON_RATE_LIMIT")
     default_max_tokens: int = Field(512, alias="DEFAULT_MAX_TOKENS")
     max_output_tokens: int = Field(1024, alias="MAX_OUTPUT_TOKENS")
     max_batch_size: int = Field(1, alias="NIM_TRITON_MAX_BATCH_SIZE")
     system_prompt: str = Field(DEFAULT_SYSTEM_PROMPT, alias="VLM_CAPTION_SYSTEM_PROMPT")
     user_prompt: str = Field(DEFAULT_USER_PROMPT, alias="VLM_CAPTION_PROMPT")
     video_pruning_rate: float = Field(0.0, alias="VIDEO_PRUNING_RATE")
-    enable_otel: bool = Field(False, alias="NIM_ENABLE_OTEL")
-    otel_endpoint: str | None = Field(None, alias="NIM_OTEL_EXPORTER_OTLP_ENDPOINT")
-    otel_service_name: str | None = Field(None, alias="NIM_OTEL_SERVICE_NAME")
     enable_mock_inference: bool = Field(False, alias="ENABLE_MOCK_INFERENCE")
     venv_path: str = Field("/opt/venv")
 

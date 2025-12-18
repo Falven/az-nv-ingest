@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Iterable, Optional
 
+from fastapi import HTTPException, status
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -22,6 +23,47 @@ def parse_max_batch_size(config: Dict[str, Any]) -> Optional[int]:
     """
     max_batch = config.get("max_batch_size")
     return int(max_batch) if isinstance(max_batch, int) and max_batch > 0 else None
+
+
+def resolve_max_batch_size(
+    config_limit: Optional[int], settings_limit: Optional[int]
+) -> Optional[int]:
+    """
+    Determine the effective max_batch_size from Triton config and settings.
+    """
+    if config_limit is not None and settings_limit is not None:
+        return min(config_limit, settings_limit)
+    if config_limit is not None:
+        return config_limit
+    return settings_limit
+
+
+def validate_requested_model(
+    requested_model: str | None, expected_model_id: str
+) -> None:
+    """
+    Raise an HTTP 400 when a request targets an unexpected model identifier.
+    """
+    if requested_model is None:
+        return
+    if requested_model != expected_model_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported model '{requested_model}', expected '{expected_model_id}'",
+        )
+
+
+def validate_batch_size(item_count: int, max_batch_size: Optional[int]) -> None:
+    """
+    Enforce an upper bound on batch sizes when configured.
+    """
+    if max_batch_size is None:
+        return
+    if item_count > max_batch_size:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Batch size {item_count} exceeds limit {max_batch_size}",
+        )
 
 
 class TritonHttpClient:
@@ -45,6 +87,13 @@ class TritonHttpClient:
         )
         self.model_name = model_name
         self.timeout = timeout
+
+    @property
+    def client(self) -> triton_http.InferenceServerClient:
+        """
+        Expose the underlying Triton HTTP client for inference calls.
+        """
+        return self._client
 
     def is_ready(self) -> bool:
         try:

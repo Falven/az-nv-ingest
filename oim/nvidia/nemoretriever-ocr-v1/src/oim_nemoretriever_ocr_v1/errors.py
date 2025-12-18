@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from oim_common.errors import InvalidImageError
+
 
 class ModelLoadError(RuntimeError):
     """
@@ -7,7 +9,4 @@ class ModelLoadError(RuntimeError):
     """
 
 
-class InvalidImageError(ValueError):
-    """
-    Raised when an image payload cannot be decoded.
-    """
+__all__ = ["ModelLoadError", "InvalidImageError"]

@@ -3,32 +3,39 @@ from __future__ import annotations
 import logging
 import time
 from contextlib import nullcontext
-from typing import AsyncIterator, Awaitable, Callable, ContextManager
+from typing import AsyncIterator, ContextManager
 
 import numpy as np
 import tritonclient.grpc as grpcclient
-from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi import Depends, FastAPI, HTTPException
 from oim_common.auth import build_http_auth_dependency
-from oim_common.logging import configure_logging
-from oim_common.metrics import (
-    metrics_response,
-    observe_ocr_request,
-    start_metrics_server,
+from oim_common.fastapi import (
+    add_health_routes,
+    add_metadata_routes,
+    add_metrics_route,
+    configure_service_tracer,
+    install_http_middleware,
+    start_background_metrics,
 )
-from oim_common.telemetry import configure_tracer
+from oim_common.logging import configure_logging
+from oim_common.metrics import observe_ocr_request
+from oim_common.triton import parse_max_batch_size
 from opentelemetry.trace import Status, StatusCode
 
 from .inference import parsed_from_triton_output
 from .models import InferRequest, InferResponse, InferResponseItem
 from .settings import ServiceSettings
 
+MODEL_ID = "nvidia/nemotron-ocr-v1"
+MODEL_SHORT_NAME = "nemoretriever-ocr-v1"
+
 settings = ServiceSettings()
 configure_logging(settings.log_level)
 logger = logging.getLogger("nemoretriever-ocr-v1")
-tracer = configure_tracer(
+tracer = configure_service_tracer(
     enabled=getattr(settings, "enable_otel", False) or bool(settings.otel_endpoint),
-    service_name=settings.otel_service_name or settings.model_name,
+    model_id=settings.otel_service_name or settings.model_name,
+    model_version=settings.model_version,
     otel_endpoint=settings.otel_endpoint,
 )
 triton_client = grpcclient.InferenceServerClient(
@@ -48,7 +55,7 @@ async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """
     Start background services while Triton remains managed by the entrypoint.
     """
-    start_metrics_server(settings.metrics_port, settings.auth_required)
+    start_background_metrics(settings)
     yield
 
 
@@ -56,83 +63,55 @@ app = FastAPI(
     title=settings.model_name, version=settings.model_version, lifespan=_lifespan
 )
 
-
-@app.middleware("http")
-async def _http_tracing(
-    request: Request, call_next: Callable[[Request], Awaitable[Response]]
-) -> Response:
-    """
-    Wrap HTTP requests with an OTEL span when tracing is configured.
-    """
-    if tracer is None:
-        return await call_next(request)
-    span_name = f"http {request.method.lower()} {request.url.path}"
-    with tracer.start_as_current_span(span_name) as span:
-        span.set_attribute("http.method", request.method)
-        span.set_attribute("http.route", request.url.path)
-        try:
-            response = await call_next(request)
-        except Exception as exc:  # pragma: no cover - surfaced to caller
-            span.record_exception(exc)
-            span.set_status(Status(status_code=StatusCode.ERROR))
-            raise
-        span.set_attribute("http.status_code", response.status_code)
-        if response.status_code >= 400:
-            span.set_status(Status(status_code=StatusCode.ERROR))
-        return response
+install_http_middleware(app, tracer)
 
 
-@app.get("/v1/health/live")
-async def live() -> JSONResponse:
-    """
-    Simple liveness probe.
-    """
-    return JSONResponse({"status": "live"}, status_code=200)
-
-
-@app.get("/v1/health/ready")
-async def ready() -> JSONResponse:
+def _ready_check() -> bool:
     """
     Report readiness based on Triton model status.
     """
     try:
-        is_ready = triton_client.is_model_ready(settings.model_name)
+        return bool(triton_client.is_model_ready(settings.model_name))
     except Exception as exc:
         logger.exception("Triton readiness check failed: %s", exc)
-        return JSONResponse({"status": "unavailable"}, status_code=503)
-    status_value = "ready" if is_ready else "unavailable"
-    return JSONResponse({"status": status_value}, status_code=200 if is_ready else 503)
+        return False
 
 
-@app.get("/v1/metadata", dependencies=[auth_dependency])
-async def metadata() -> JSONResponse:
+def _metadata_max_batch_size() -> int:
     """
-    Return model metadata in the nv-ingest discovery shape.
+    Resolve maxBatchSize from Triton metadata with a local fallback.
     """
     try:
-        meta = triton_client.get_model_metadata(
+        metadata = triton_client.get_model_metadata(
             model_name=settings.model_name, as_json=True
         )
-        max_batch = meta.get("max_batch_size", settings.max_batch_size)
     except Exception:
-        max_batch = settings.max_batch_size
-    model_info = {
-        "id": "nvidia/nemotron-ocr-v1",
-        "name": "nemotron-ocr-v1",
-        "version": settings.model_version,
-        "shortName": "nemoretriever-ocr-v1",
-        "maxBatchSize": max_batch,
-    }
-    return JSONResponse({"modelInfo": [model_info]}, status_code=200)
+        logger.debug("Failed to fetch Triton metadata for batch size.", exc_info=True)
+        return settings.max_batch_size
+    parsed = parse_max_batch_size(metadata) if isinstance(metadata, dict) else None
+    return parsed if parsed is not None else settings.max_batch_size
 
 
-@app.get("/metrics", dependencies=[auth_dependency])
-@app.get("/v2/metrics", dependencies=[auth_dependency])
-async def metrics() -> Response:
-    """
-    Render Prometheus metrics collected by the FastAPI shim.
-    """
-    return metrics_response()
+add_health_routes(
+    app,
+    ready_check=_ready_check,
+    response_style="status",
+)
+add_metadata_routes(
+    app,
+    model_id=MODEL_ID,
+    model_version=settings.model_version,
+    short_name=MODEL_SHORT_NAME,
+    auth_dependency=[auth_dependency],
+    max_batch_size=settings.max_batch_size,
+    max_batch_size_resolver=_metadata_max_batch_size,
+    include_models_endpoint=False,
+)
+add_metrics_route(
+    app,
+    auth_dependency=[auth_dependency],
+    include_triton_route=True,
+)
 
 
 @app.post("/v1/infer", dependencies=[auth_dependency], response_model=InferResponse)

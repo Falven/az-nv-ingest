@@ -30,6 +30,7 @@ class ServiceSettings(CommonSettings):
     model_version: str = Field("1.5.0", alias="MODEL_VERSION")
     short_name: str = Field("paddleocr", alias="MODEL_SHORT_NAME")
     model_name: str = Field("paddle", alias="OCR_MODEL_NAME")
+    triton_http_url: str = Field("http://127.0.0.1:8500", alias="TRITON_HTTP_URL")
     enable_otel: bool = Field(False, alias="NIM_ENABLE_OTEL")
     otel_service_name: str = Field("paddleocr", alias="NIM_OTEL_SERVICE_NAME")
     otel_endpoint: Optional[str] = Field(None, alias="NIM_OTEL_EXPORTER_OTLP_ENDPOINT")

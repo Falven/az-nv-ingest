@@ -2,18 +2,20 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Optional
+from typing import AsyncIterator
 
 from fastapi import Depends, FastAPI, HTTPException
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse
 from oim_common.auth import build_http_auth_dependency
-from oim_common.logging import configure_logging
-from oim_common.metrics import (
-    metrics_response,
-    record_request,
-    start_metrics_server,
-    track_inflight,
+from oim_common.fastapi import (
+    add_health_routes,
+    add_metadata_routes,
+    add_metrics_route,
+    add_root_route,
+    start_background_metrics,
 )
+from oim_common.logging import configure_logging
+from oim_common.metrics import record_request, track_inflight
 
 from .clients.triton_client import TritonClient
 from .errors import InferenceError, InvalidImageError, TritonInferenceError
@@ -24,20 +26,16 @@ from .settings import ServiceSettings
 settings = ServiceSettings()
 configure_logging(settings.effective_log_level)
 logger = logging.getLogger(settings.model_name)
-triton_client: Optional[TritonClient] = None
+triton_client: TritonClient = TritonClient(settings)
 auth_dependency = Depends(build_http_auth_dependency(settings))
 
 
-async def _lifespan(_app: FastAPI):
+async def _lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Manage startup and shutdown tasks for the FastAPI app."""
-    global triton_client
-    start_metrics_server(settings.metrics_port, settings.auth_required)
-    triton_client = TritonClient(settings)
+    start_background_metrics(settings)
     await triton_client.wait_for_model_ready()
     yield
-    if triton_client is not None:
-        triton_client.close()
-        triton_client = None
+    triton_client.close()
 
 
 app = FastAPI(
@@ -46,67 +44,42 @@ app = FastAPI(
 
 
 def _ensure_client() -> TritonClient:
-    """Return an initialized Triton client or raise 503."""
-    if triton_client is None:
-        raise HTTPException(status_code=503, detail="Triton client is not ready")
+    """Return the active Triton client."""
     return triton_client
 
 
-@app.get("/v1/health/live")
-async def live() -> JSONResponse:
-    """Liveness probe for container orchestration."""
-    return JSONResponse({"live": True}, status_code=200)
-
-
-@app.get("/v1/health/ready")
-async def ready() -> JSONResponse:
+def _ready_check() -> bool:
     """Readiness probe indicating model availability."""
-    client = triton_client
-    is_ready = bool(client and client.is_model_ready())
-    return JSONResponse({"ready": is_ready}, status_code=200)
+    return bool(triton_client.is_ready())
+
+
+add_health_routes(app, ready_check=_ready_check)
+add_metadata_routes(
+    app,
+    model_id=settings.model_name,
+    model_version=settings.model_version,
+    auth_dependency=[auth_dependency],
+    max_batch_size=settings.max_batch_size,
+    include_models_endpoint=False,
+)
+add_metrics_route(
+    app,
+    auth_dependency=[auth_dependency],
+    include_triton_route=True,
+)
+add_root_route(app, message=f"{settings.model_name} HTTP")
 
 
 @app.get("/v2/health/live")
 async def triton_live() -> JSONResponse:
     """Triton-compatible liveness probe."""
-    client = triton_client
-    is_live = bool(client and client.is_server_ready())
-    return JSONResponse({"live": is_live}, status_code=200)
+    return JSONResponse({"live": triton_client.is_live()}, status_code=200)
 
 
 @app.get("/v2/health/ready")
 async def triton_ready() -> JSONResponse:
     """Triton-compatible readiness probe."""
-    client = triton_client
-    is_ready = bool(client and client.is_model_ready())
-    return JSONResponse({"ready": is_ready}, status_code=200)
-
-
-@app.get("/v1/metadata", dependencies=[auth_dependency])
-async def metadata() -> JSONResponse:
-    """Expose model metadata for discovery."""
-    short_name = f"{settings.model_name}:{settings.model_version}"
-    payload = {
-        "id": settings.model_name,
-        "name": settings.model_name,
-        "version": settings.model_version,
-        "modelInfo": [
-            {
-                "name": settings.model_name,
-                "version": settings.model_version,
-                "shortName": short_name,
-                "maxBatchSize": settings.max_batch_size,
-            }
-        ],
-    }
-    return JSONResponse(payload, status_code=200)
-
-
-@app.get("/metrics", dependencies=[auth_dependency])
-@app.get("/v2/metrics", dependencies=[auth_dependency])
-async def metrics() -> Response:
-    """Render Prometheus metrics."""
-    return metrics_response()
+    return JSONResponse({"ready": triton_client.is_ready()}, status_code=200)
 
 
 @app.get("/v2/models/{model_name}", dependencies=[auth_dependency])
@@ -140,9 +113,7 @@ async def model_ready_http(model_name: str) -> JSONResponse:
     """Report model readiness for Triton parity endpoints."""
     if model_name != settings.triton_model_name:
         raise HTTPException(status_code=404, detail="Unknown model")
-    client = triton_client
-    is_ready = bool(client and client.is_model_ready())
-    return JSONResponse({"ready": is_ready})
+    return JSONResponse({"ready": triton_client.is_ready()})
 
 
 @app.post("/v1/infer", dependencies=[auth_dependency])
@@ -183,12 +154,6 @@ async def infer(request_body: InferRequest) -> JSONResponse:
     response_items = format_http_predictions(predictions)
     record_request("http", endpoint, "success", start_time)
     return JSONResponse({"data": response_items}, status_code=200)
-
-
-@app.get("/")
-async def root() -> JSONResponse:
-    """Health message for the service root."""
-    return JSONResponse({"message": f"{settings.model_name} HTTP"}, status_code=200)
 
 
 if __name__ == "__main__":

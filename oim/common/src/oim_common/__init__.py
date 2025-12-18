@@ -44,7 +44,14 @@ from oim_common.settings import (
     TritonHttpSettings,
 )
 from oim_common.telemetry import configure_tracer
-from oim_common.triton import TritonGrpcClient, TritonHttpClient, parse_max_batch_size
+from oim_common.triton import (
+    TritonGrpcClient,
+    TritonHttpClient,
+    parse_max_batch_size,
+    resolve_max_batch_size,
+    validate_batch_size,
+    validate_requested_model,
+)
 
 __all__ = [
     "CommonSettings",
@@ -89,6 +96,9 @@ __all__ = [
     "TritonHttpClient",
     "TritonGrpcClient",
     "parse_max_batch_size",
+    "resolve_max_batch_size",
+    "validate_requested_model",
+    "validate_batch_size",
     "OIMError",
     "InvalidImageError",
     "InferenceError",

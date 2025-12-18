@@ -62,6 +62,25 @@ class TritonClient:
             logger.debug("Triton model readiness probe failed", exc_info=True)
             return False
 
+    def is_live(self) -> bool:
+        """Alias for Triton server liveness."""
+        return self.is_server_ready()
+
+    def is_ready(self) -> bool:
+        """Alias for Triton model readiness."""
+        return self.is_model_ready()
+
+    def repository_index(self) -> list[dict[str, object]]:
+        """Return the Triton model repository index."""
+        try:
+            response = self._client.get_model_repository_index()
+        except InferenceServerException:
+            logger.debug("Triton repository index probe failed", exc_info=True)
+            return []
+        parsed = MessageToDict(response, preserving_proto_field_name=True)
+        models = parsed.get("models")
+        return models if isinstance(models, list) else []
+
     async def wait_for_model_ready(self) -> None:
         """Block until Triton reports the model is ready."""
         await asyncio.to_thread(self._wait_for_model_ready_sync)

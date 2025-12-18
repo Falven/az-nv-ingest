@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import base64
-import logging
 from typing import Any, Dict, List, Optional
 
 import numpy as np
 from fastapi import HTTPException, status
+from oim_common.logging import get_logger
+from oim_common.triton import (
+    TritonHttpClient,
+    parse_max_batch_size,
+    resolve_max_batch_size,
+)
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -27,7 +32,7 @@ from .models import (
 )
 from .settings import ServiceSettings
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 TRUNCATION_CODES: Dict[TruncationMode, int] = {"NONE": 0, "END": 1, "START": 2}
 
@@ -68,14 +73,6 @@ def _parse_embedding_dim(metadata: Dict[str, Any]) -> Optional[int]:
     return None
 
 
-def _parse_max_batch_size(config: Dict[str, Any]) -> Optional[int]:
-    """
-    Read the Triton max_batch_size from the model config.
-    """
-    max_batch = config.get("max_batch_size")
-    return int(max_batch) if isinstance(max_batch, int) and max_batch > 0 else None
-
-
 class TritonEmbeddingClient:
     """
     Thin wrapper around the Triton HTTP client for embedding inference.
@@ -83,61 +80,50 @@ class TritonEmbeddingClient:
 
     def __init__(self, settings: ServiceSettings):
         self._settings = settings
-        self._client = triton_http.InferenceServerClient(
-            url=settings.triton_http_endpoint,
+        self._triton_client = TritonHttpClient(
+            endpoint=settings.triton_http_endpoint,
+            model_name=settings.triton_model_name,
+            timeout=settings.triton_timeout,
             verbose=bool(settings.log_verbose),
-            connection_timeout=settings.triton_timeout,
-            network_timeout=settings.triton_timeout,
         )
-        self._model_name = settings.triton_model_name
-        metadata = self._client.get_model_metadata(model_name=self._model_name)
+        self._client = self._triton_client.client
+        self._model_name = self._triton_client.model_name
+        metadata = self._triton_client.model_metadata()
         self._embedding_dim = _parse_embedding_dim(metadata)
-        config = self._client.get_model_config(model_name=self._model_name)
-        config_max_batch = _parse_max_batch_size(config) or settings.max_batch_size
-        self._max_batch_size = (
-            min(config_max_batch, settings.max_batch_size)
-            if config_max_batch and settings.max_batch_size
-            else config_max_batch or settings.max_batch_size
+        config = self._triton_client.model_config()
+        self._max_batch_size = resolve_max_batch_size(
+            parse_max_batch_size(config), settings.max_batch_size
         )
 
     def is_ready(self) -> bool:
         """
         Report readiness based on Triton server and model status.
         """
-        try:
-            return bool(
-                self._client.is_server_ready()
-                and self._client.is_model_ready(model_name=self._model_name)
-            )
-        except Exception:
-            return False
+        return self._triton_client.is_ready()
 
     def is_live(self) -> bool:
         """
         Report liveness from the Triton server.
         """
-        try:
-            return bool(self._client.is_server_live())
-        except Exception:
-            return False
+        return self._triton_client.is_live()
 
     def model_metadata(self) -> Dict[str, Any]:
         """
         Fetch model metadata for Triton v2 endpoints.
         """
-        return self._client.get_model_metadata(model_name=self._model_name)
+        return self._triton_client.model_metadata()
 
     def model_config(self) -> Dict[str, Any]:
         """
         Fetch model config for Triton v2 endpoints.
         """
-        return self._client.get_model_config(model_name=self._model_name)
+        return self._triton_client.model_config()
 
     def repository_index(self) -> List[Dict[str, Any]]:
         """
         Return the model repository index.
         """
-        return self._client.get_model_repository_index()
+        return list(self._triton_client.repository_index())
 
     def embed(self, request_body: EmbeddingsRequest) -> Dict[str, Any]:
         """

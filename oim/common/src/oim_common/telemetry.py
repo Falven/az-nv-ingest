@@ -41,6 +41,7 @@ def configure_tracer(
     service_name: str,
     otel_endpoint: str | None,
     resource_attributes: Optional[Mapping[str, str]] = None,
+    enable_metrics: bool = True,
 ) -> Optional["trace.Tracer"]:
     """
     Configure OpenTelemetry tracing and metrics when requested.
@@ -76,16 +77,17 @@ def configure_tracer(
         )
         trace.set_tracer_provider(tracer_provider)
 
-        metric_reader = PeriodicExportingMetricReader(
-            OTLPMetricExporter(
-                endpoint=_endpoint(otel_endpoint, "metrics"),
-                insecure=True,
+        if enable_metrics:
+            metric_reader = PeriodicExportingMetricReader(
+                OTLPMetricExporter(
+                    endpoint=_endpoint(otel_endpoint, "metrics"),
+                    insecure=True,
+                )
             )
-        )
-        meter_provider = MeterProvider(
-            resource=resource, metric_readers=[metric_reader]
-        )
-        otel_metrics.set_meter_provider(meter_provider)
+            meter_provider = MeterProvider(
+                resource=resource, metric_readers=[metric_reader]
+            )
+            otel_metrics.set_meter_provider(meter_provider)
         return trace.get_tracer(service_name)
     except Exception:
         logger.exception("Failed to configure OpenTelemetry")

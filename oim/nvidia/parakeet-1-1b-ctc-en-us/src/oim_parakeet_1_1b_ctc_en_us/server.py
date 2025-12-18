@@ -4,63 +4,40 @@ import logging
 import os
 import time
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from fastapi import FastAPI
 from oim_common.auth import AuthValidator, build_http_auth_dependency
 from oim_common.logging import configure_logging
+from oim_common.telemetry import configure_tracer
+
 from .grpc_server import RequestLimiter, create_grpc_server
 from .http_api import create_router
 from .inference import create_asr_backend
 from .metrics import RequestMetrics
 from .settings import ServiceSettings
 
-try:
-    from opentelemetry import trace
-    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-    from opentelemetry.sdk.resources import Resource
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor
-except Exception:  # pragma: no cover - optional dependency
-    trace = None
-    OTLPSpanExporter = None
-    Resource = None
-    TracerProvider = None
-    BatchSpanProcessor = None
+if TYPE_CHECKING:
+    from opentelemetry.trace import Tracer
 
 LOGGER = logging.getLogger(__name__)
 APP_START_TIME = time.time()
 
 
-def configure_tracer(settings: ServiceSettings) -> Optional["trace.Tracer"]:
-    """
-    Configure an OTLP tracer when an endpoint is provided.
-    """
+def _configure_tracer(settings: ServiceSettings) -> Optional["Tracer"]:
     endpoint = settings.otel_endpoint or os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
     if not endpoint:
         return None
-    if (
-        trace is None
-        or OTLPSpanExporter is None
-        or TracerProvider is None
-        or BatchSpanProcessor is None
-    ):
-        LOGGER.warning(
-            "OpenTelemetry requested but not available; skipping OTEL setup."
-        )
-        return None
-    resource = Resource.create(
-        {
-            "service.name": settings.otel_service_name,
+    return configure_tracer(
+        enabled=True,
+        service_name=settings.otel_service_name or settings.model_name,
+        otel_endpoint=endpoint,
+        resource_attributes={
             "service.version": settings.model_version,
             "service.instance.id": settings.model_name,
-        }
+        },
+        enable_metrics=False,
     )
-    provider = TracerProvider(resource=resource)
-    processor = BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint))
-    provider.add_span_processor(processor)
-    trace.set_tracer_provider(provider)
-    return trace.get_tracer(settings.otel_service_name)
 
 
 settings = ServiceSettings()
@@ -81,7 +58,7 @@ async def lifespan(app: FastAPI):
     """
     Initialize shared components and start the gRPC server alongside FastAPI.
     """
-    tracer = configure_tracer(settings)
+    tracer = _configure_tracer(settings)
     limiter = RequestLimiter(
         settings.max_concurrent_requests, settings.max_streaming_sessions
     )

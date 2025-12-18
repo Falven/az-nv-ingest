@@ -1,21 +1,19 @@
 from __future__ import annotations
 
-import logging
 import os
 import time
 from contextlib import asynccontextmanager, nullcontext
 from typing import Any, Mapping
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, Response, StreamingResponse
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse, StreamingResponse
 from oim_common.auth import build_http_auth_dependency
-from oim_common.logging import configure_logging
-from oim_common.metrics import (
-    metrics_response,
-    record_request,
-    start_metrics_server,
-    track_inflight,
+from oim_common.fastapi import (
+    add_metrics_route,
+    install_http_middleware,
+    start_background_metrics,
 )
+from oim_common.logging import configure_logging, get_logger
 from oim_common.rate_limit import AsyncRateLimiter
 from oim_common.telemetry import configure_tracer
 from pydantic import ValidationError
@@ -31,14 +29,14 @@ from .settings import ServiceSettings
 
 settings = ServiceSettings()
 configure_logging(settings.logging_level)
-logger = logging.getLogger("nemotron-nano-12b-v2-vl")
+logger = get_logger("nemotron-nano-12b-v2-vl")
 tracer = configure_tracer(
     enabled=settings.enable_otel,
     service_name=settings.otel_service_name or settings.served_model_name,
     otel_endpoint=settings.otel_endpoint,
 )
 rate_limiter = AsyncRateLimiter(settings.rate_limit)
-auth_dependency = build_http_auth_dependency(settings)
+auth_dependency = Depends(build_http_auth_dependency(settings))
 triton_client: TritonCaptionClient | None = None
 startup_error: str | None = None
 
@@ -72,7 +70,7 @@ async def _lifespan(_app: FastAPI):
     Manage startup and shutdown tasks for the FastAPI application.
     """
     global triton_client, startup_error
-    start_metrics_server(settings.metrics_port, settings.auth_required)
+    start_background_metrics(settings)
     try:
         client = TritonCaptionClient(settings)
         await client.wait_for_ready()
@@ -91,6 +89,9 @@ app = FastAPI(
     version=settings.model_version,
     lifespan=_lifespan,
 )
+
+install_http_middleware(app, tracer)
+add_metrics_route(app, auth_dependency=[auth_dependency])
 
 
 @app.get("/v1/health/live", dependencies=[auth_dependency])
@@ -143,87 +144,72 @@ async def metadata() -> Mapping[str, Any]:
     }
 
 
-@app.get("/metrics", dependencies=[auth_dependency])
-async def metrics_endpoint() -> Response:
-    """
-    Prometheus metrics endpoint.
-    """
-    return metrics_response()
-
-
 @app.post("/v1/chat/completions", dependencies=[auth_dependency])
-async def chat_completions(request: Request) -> Response:
+async def chat_completions(
+    request: Request,
+) -> JSONResponse | StreamingResponse:
     """
     Caption an image using the VLM model through Triton.
     """
-    started = time.perf_counter()
-    endpoint = "/v1/chat/completions"
-    status_label = "200"
-    with track_inflight("http", endpoint):
-        try:
-            payload = ChatRequest.model_validate(await request.json())
-            client = _ensure_triton_client()
-            parsed = prepare_request(payload, settings)
-            completion_id = f"chatcmpl-{os.urandom(6).hex()}"
-            created = int(time.time())
+    try:
+        payload = ChatRequest.model_validate(await request.json())
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
 
-            rate_context = rate_limiter.limit()
-            span_context = (
-                tracer.start_as_current_span("chat_completions")
-                if tracer
-                else nullcontext()
-            )
-            async with rate_context:
-                with span_context:
-                    if parsed.stream:
-                        generator = stream_caption(
-                            client,
-                            parsed,
-                            completion_id,
-                            created,
-                            settings.served_model_name,
-                        )
-                        return StreamingResponse(
-                            generator,
-                            media_type="text/event-stream",
-                        )
-                    caption = await generate_caption(client, parsed)
+    client = _ensure_triton_client()
+    parsed = prepare_request(payload, settings)
+    completion_id = f"chatcmpl-{os.urandom(6).hex()}"
+    created = int(time.time())
 
-            response = ChatResponse(
-                id=completion_id,
-                object="chat.completion",
-                created=created,
-                model=settings.served_model_name,
-                choices=[
-                    ChatChoice(
-                        index=0,
-                        message=ChatMessageResponse(
-                            role="assistant",
-                            content=caption,
-                        ),
-                        finish_reason="stop",
+    rate_context = rate_limiter.limit()
+    span_context = (
+        tracer.start_as_current_span("chat_completions") if tracer else nullcontext()
+    )
+    try:
+        async with rate_context:
+            with span_context:
+                if parsed.stream:
+                    generator = stream_caption(
+                        client,
+                        parsed,
+                        completion_id,
+                        created,
+                        settings.served_model_name,
                     )
-                ],
+                    return StreamingResponse(
+                        generator,
+                        media_type="text/event-stream",
+                    )
+                caption = await generate_caption(client, parsed)
+    except HTTPException:
+        raise
+    except Exception as exc:  # pragma: no cover - surfaced to logs
+        logger.exception("Unhandled error during chat completion")
+        raise HTTPException(
+            status_code=500,
+            detail="internal server error",
+        ) from exc
+
+    response = ChatResponse(
+        id=completion_id,
+        object="chat.completion",
+        created=created,
+        model=settings.served_model_name,
+        choices=[
+            ChatChoice(
+                index=0,
+                message=ChatMessageResponse(
+                    role="assistant",
+                    content=caption,
+                ),
+                finish_reason="stop",
             )
-            return JSONResponse(content=response.model_dump())
-        except HTTPException as exc:
-            status_label = str(exc.status_code)
-            raise
-        except ValidationError as exc:
-            status_label = "400"
-            raise HTTPException(
-                status_code=400,
-                detail=str(exc),
-            ) from exc
-        except Exception as exc:  # pragma: no cover - surfaced to logs
-            logger.exception("Unhandled error during chat completion")
-            status_label = "500"
-            raise HTTPException(
-                status_code=500,
-                detail="internal server error",
-            ) from exc
-        finally:
-            record_request("http", endpoint, status_label, started)
+        ],
+    )
+    return JSONResponse(content=response.model_dump())
 
 
 @app.get("/", dependencies=[auth_dependency])

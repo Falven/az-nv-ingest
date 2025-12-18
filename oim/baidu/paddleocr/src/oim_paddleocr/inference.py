@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import asyncio
-import base64
+import json
 import io
 import time
 from typing import List, Sequence
 
 import numpy as np
-import requests
 from fastapi import HTTPException
 from PIL import Image
+from oim_common.images import load_image_bytes
 
 from .models import (
     BoundingBox,
@@ -97,28 +97,13 @@ def _get_paddleocr() -> PaddleOCRVL:
     return _paddleocr_instance
 
 
-def decode_data_url(data_url: str) -> bytes:
-    try:
-        _, payload = data_url.split(",", maxsplit=1)
-    except ValueError as exc:
-        raise ValueError(
-            "Expected data URL in the form data:image/<type>;base64,<payload>."
-        ) from exc
-    return base64.b64decode(payload)
-
-
 def to_bgr(image: Image.Image) -> np.ndarray:
     return np.array(image.convert("RGB"))[:, :, ::-1]
 
 
 def load_image(url: str, timeout: float) -> np.ndarray:
-    if url.startswith("data:"):
-        return to_bgr(Image.open(io.BytesIO(decode_data_url(url))))
-    if url.startswith("http://") or url.startswith("https://"):
-        response = requests.get(url, timeout=timeout)
-        response.raise_for_status()
-        return to_bgr(Image.open(io.BytesIO(response.content)))
-    return to_bgr(Image.open(url))
+    png_bytes = load_image_bytes(url, timeout, allow_remote=True, allow_file=True)
+    return to_bgr(Image.open(io.BytesIO(png_bytes)))
 
 
 def normalize_points(
@@ -136,10 +121,12 @@ def normalize_points(
     return norm
 
 
-def format_result(result) -> InferResponseItem:
+def format_result(
+    result, image_size: tuple[int, int] | None = None
+) -> InferResponseItem:
     detections: List[TextDetection] = []
     try:
-        width, height = result.page_size
+        width, height = image_size if image_size is not None else result.page_size
     except Exception as exc:  # pragma: no cover - defensive guard
         raise HTTPException(
             status_code=500, detail=f"Invalid result object: {exc}"
@@ -207,6 +194,21 @@ def collect_triplets(item: InferResponseItem):
         texts.append(detection.text_prediction.text)
         confidences.append(float(detection.text_prediction.confidence))
     return boxes, texts, confidences
+
+
+def build_grpc_output(items: Sequence[InferResponseItem]) -> np.ndarray:
+    """
+    Convert OCR results to a (3, batch) array of JSON-encoded bytes for Triton gRPC.
+    """
+    boxes: List[bytes] = []
+    texts: List[bytes] = []
+    confidences: List[bytes] = []
+    for item in items:
+        bboxes, text_predictions, conf_scores = collect_triplets(item)
+        boxes.append(json.dumps(bboxes).encode("utf-8"))
+        texts.append(json.dumps(text_predictions).encode("utf-8"))
+        confidences.append(json.dumps(conf_scores).encode("utf-8"))
+    return np.asarray([boxes, texts, confidences], dtype=np.object_)
 
 
 def state_snapshot() -> ModelState:
