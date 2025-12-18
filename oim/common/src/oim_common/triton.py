@@ -10,9 +10,13 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
-from tritonclient import grpc as triton_grpc
 from tritonclient import http as triton_http
 from tritonclient.utils import InferenceServerException
+
+try:
+    from tritonclient import grpc as triton_grpc
+except ImportError:  # pragma: no cover - optional dependency
+    triton_grpc = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +137,8 @@ class TritonGrpcClient:
         timeout: float,
         verbose: bool = False,
     ):
+        if triton_grpc is None:
+            raise RuntimeError("tritonclient[grpc] is required for gRPC clients")
         self._client = triton_grpc.InferenceServerClient(
             url=endpoint,
             verbose=verbose,

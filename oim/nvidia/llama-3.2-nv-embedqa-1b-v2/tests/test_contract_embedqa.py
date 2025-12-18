@@ -114,6 +114,12 @@ def service() -> Iterator[Dict[str, Any]]:
 
 
 def test_health_and_metadata(service: Dict[str, Any]) -> None:
+    status, ready_payload = http_json(
+        "GET", f"{service['base_url']}/health/ready", None, {}
+    )
+    assert status == 200
+    assert ready_payload == {"ready": True}
+
     headers = {"Authorization": f"Bearer {service['token']}"}
     status, ready_payload = http_json(
         "GET", f"{service['base_url']}/health/ready", None, headers=headers
@@ -121,15 +127,13 @@ def test_health_and_metadata(service: Dict[str, Any]) -> None:
     assert status == 200
     assert ready_payload == {"ready": True}
 
-    status, models_payload = http_json(
-        "GET", f"{service['base_url']}/models", None, headers=headers
-    )
+    status, models_payload = http_json("GET", f"{service['base_url']}/models", None, {})
     assert status == 200
     assert models_payload is not None
     assert models_payload.get("data") and models_payload["data"][0]["id"] == MODEL_ID
 
     status, metadata_payload = http_json(
-        "GET", f"{service['base_url']}/metadata", None, headers=headers
+        "GET", f"{service['base_url']}/metadata", None, {}
     )
     assert status == 200
     assert metadata_payload is not None

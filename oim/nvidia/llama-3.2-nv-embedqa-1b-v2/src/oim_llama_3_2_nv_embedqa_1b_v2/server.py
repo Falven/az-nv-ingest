@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 from oim_common.auth import build_http_auth_dependency
 from oim_common.fastapi import (
     add_health_routes,
@@ -32,7 +32,9 @@ tracer = configure_service_tracer(
 )
 triton_client = TritonEmbeddingClient(settings)
 async_rate_limiter = AsyncRateLimiter(settings.rate_limit)
-auth_dependency = Depends(build_http_auth_dependency(settings))
+auth_dependency = (
+    [build_http_auth_dependency(settings)] if settings.auth_required else []
+)
 
 
 async def _lifespan(app: FastAPI):
@@ -51,27 +53,24 @@ app = FastAPI(
 install_http_middleware(app, tracer)
 add_health_routes(
     app,
-    live_dependency=[auth_dependency],
-    ready_dependency=[auth_dependency],
     ready_check=triton_client.is_ready,
 )
 add_metadata_routes(
     app,
     model_id=settings.model_id,
     model_version=settings.model_version,
-    auth_dependency=[auth_dependency],
 )
 add_triton_routes(
     app,
     triton_model_name=settings.triton_model_name,
     client=triton_client,
-    auth_dependency=[auth_dependency],
+    auth_dependency=auth_dependency,
 )
-add_metrics_route(app, auth_dependency=[auth_dependency])
-add_root_route(app, message=settings.model_id, auth_dependency=[auth_dependency])
+add_metrics_route(app, auth_dependency=auth_dependency)
+add_root_route(app, message=settings.model_id, auth_dependency=auth_dependency)
 
 
-@app.post("/v1/embeddings", dependencies=[auth_dependency])
+@app.post("/v1/embeddings", dependencies=auth_dependency)
 async def embeddings(request_body: EmbeddingsRequest) -> Dict[str, Any]:
     """
     Compute embeddings for provided input texts.

@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import io
+import json
 import time
 from typing import List, Sequence
 
 import numpy as np
 from fastapi import HTTPException
-from PIL import Image
 from oim_common.images import load_image_bytes
+from PIL import Image
 
 from .models import (
     BoundingBox,
